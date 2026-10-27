@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import {
     router,
     json,
@@ -10,25 +10,26 @@ import {
 
 type CollectionName = 'ventures' | 'tasks' | 'integrations' | 'capabilities' | 'activity';
 type WorkspaceState = Record<CollectionName, Array<Record<string, unknown>>>;
-type StoredRecord = {
-    sourceId: string;
-    payload: Record<string, unknown>;
+type WorkspaceRecord = {
+    ownerPartition: string;
+    state: WorkspaceState;
     updatedAt: string;
-};
-type BootstrapRecord = {
-    status: 'in_progress' | 'complete';
-    startedAt: string;
-    completedAt?: string;
+    workspaceVersion: string;
+    bootstrapStatus: 'complete';
+    schemaVersion: 2;
 };
 
 const COLLECTIONS: CollectionName[] = ['ventures', 'tasks', 'integrations', 'capabilities', 'activity'];
+// Static table names are required by the AppDeploy database table-catalog contract.
+const WORKSPACES_TABLE = 'abp_workspaces';
 const MAX_ITEMS_PER_COLLECTION = 100;
-const BATCH_SIZE = 40;
-const MAX_ROW_BYTES = 220 * 1024;
 const MAX_REQUEST_BYTES = 850 * 1024;
+// Leave room below the database's 256 KiB per-record ceiling for the database envelope.
+const MAX_WORKSPACE_BYTES = 220 * 1024;
 
 class InputValidationError extends Error {}
 class WorkspaceConflictError extends Error {}
+class WorkspaceStorageError extends Error {}
 
 function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === 'object' && !Array.isArray(value)
@@ -40,12 +41,12 @@ function userPartition(userId: string): string {
     return createHash('sha256').update(userId, 'utf8').digest('hex').slice(0, 32);
 }
 
-function tableFor(collection: CollectionName, partition: string): string {
-    return 'abp_' + collection + '_' + partition;
+function workspaceId(userId: string): string {
+    return 'u_' + userPartition(userId);
 }
 
-function metaTableFor(partition: string): string {
-    return 'abp_meta_' + partition;
+function emptyWorkspace(): WorkspaceState {
+    return { ventures: [], tasks: [], integrations: [], capabilities: [], activity: [] };
 }
 
 function requireSourceId(value: unknown, collection: string): string {
@@ -56,11 +57,17 @@ function requireSourceId(value: unknown, collection: string): string {
 }
 
 function validateWorkspace(value: unknown): WorkspaceState {
-    const root = asRecord(value);
-    if (Buffer.byteLength(JSON.stringify(value ?? {}), 'utf8') > MAX_REQUEST_BYTES) {
+    let serialized = '';
+    try {
+        serialized = JSON.stringify(value ?? {});
+    } catch {
+        throw new InputValidationError('Workspace payload is not valid JSON data.');
+    }
+    if (Buffer.byteLength(serialized, 'utf8') > MAX_REQUEST_BYTES) {
         throw new InputValidationError('Workspace update is too large.');
     }
 
+    const root = asRecord(value);
     const result: Partial<WorkspaceState> = {};
     for (const collection of COLLECTIONS) {
         const raw = root[collection];
@@ -82,15 +89,8 @@ function validateWorkspace(value: unknown): WorkspaceState {
             }
             seen.add(sourceId);
             const normalized = { ...record, id: sourceId };
-            const payload = Object.fromEntries(Object.entries(normalized).filter(([key]) => key !== 'id'));
-            const bytes = Buffer.byteLength(JSON.stringify({
-                sourceId,
-                payload,
-                updatedAt: new Date().toISOString()
-            }), 'utf8');
-            if (bytes > MAX_ROW_BYTES) {
-                throw new InputValidationError(collection + ' record ' + sourceId + ' is too large.');
-            }
+            // Transport metadata is not user data; never persist a client-supplied version.
+            delete normalized._version;
             rows.push(normalized);
         }
         result[collection] = rows;
@@ -98,223 +98,267 @@ function validateWorkspace(value: unknown): WorkspaceState {
     return result as WorkspaceState;
 }
 
-function payloadOf(source: Record<string, unknown>): Record<string, unknown> {
-    const payload = { ...source };
-    delete payload.id;
-    return payload;
-}
-
-function physicalId(sourceId: string): string {
-    return 'r-' + sourceId;
-}
-
-function samePayload(a: Record<string, unknown>, b: Record<string, unknown>): boolean {
-    return JSON.stringify(a) === JSON.stringify(b);
-}
-
-function isRetryableConflict(err: unknown): boolean {
-    if (!isAppDatabaseError(err)) return false;
-    return err.code === 'AppDatabaseConflict'
-        || err.code === 'AppDatabaseConditionFailed'
-        || err.code === 'AppDatabaseDuplicateId';
-}
-
-async function upsertBatch(
-    table: string,
-    records: Array<Record<string, unknown>>,
-    requireVersions: boolean
-): Promise<void> {
-    const ids = records.map(item => physicalId(String(item.id)));
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-        const existing = await db.get<StoredRecord>(table, ids, { consistent: true });
-        const operations: Array<ReturnType<typeof db.tx.add> | ReturnType<typeof db.tx.update>> = [];
-
-        records.forEach((source, index) => {
-            const sourceId = String(source.id);
-            const payload = payloadOf(source);
-            const prior = existing[index];
-            if (prior && prior.sourceId !== sourceId) {
-                throw new Error('A record ID collision was detected; no overwrite was attempted.');
-            }
-            if (prior && samePayload(prior.payload, payload)) return;
-            if (prior && requireVersions && source._version !== prior.updatedAt) {
-                throw new WorkspaceConflictError('This record changed on the server. Keep the local conflict snapshot and reload before retrying.');
-            }
-
-            const value = {
-                sourceId,
-                payload,
-                updatedAt: new Date().toISOString()
-            };
-            if (prior) {
-                operations.push(db.tx.update(table, [{
-                    id: ids[index],
-                    record: value,
-                    if: { sourceId, updatedAt: prior.updatedAt }
-                }], { patch: true }));
-            } else {
-                operations.push(db.tx.add(table, [{
-                    id: ids[index],
-                    ...value
-                }]));
-            }
-        });
-
-        if (operations.length === 0) return;
-        try {
-            const outcomes = await db.transact(operations);
-            for (const outcome of outcomes as unknown[]) {
-                if (Array.isArray(outcome) && outcome.some(item => item === null || item === false)) {
-                    throw new Error('The database reported an unsettled workspace write.');
-                }
-            }
-            return;
-        } catch (err: unknown) {
-            if (isRetryableConflict(err) && attempt < 2) continue;
-            if (isAppDatabaseError(err) && err.code === 'AppDatabaseUnknownOutcome') {
-                const after = await db.get<StoredRecord>(table, ids, { consistent: true });
-                const reconciled = records.every((source, index) => {
-                    const current = after[index];
-                    return Boolean(current)
-                        && current!.sourceId === String(source.id)
-                        && samePayload(current!.payload, payloadOf(source));
-                });
-                if (reconciled) return;
-                throw new Error('A database write outcome is unknown and could not be reconciled. Manual review is required.');
-            }
-            throw err;
-        }
+function stableValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map(stableValue);
+    if (value && typeof value === 'object') {
+        const record = value as Record<string, unknown>;
+        return Object.fromEntries(
+            Object.keys(record).sort().map(key => [key, stableValue(record[key])])
+        );
     }
-    throw new Error('Workspace changed concurrently. Refresh and retry the save.');
+    return value;
 }
 
-async function writeWorkspace(userId: string, state: WorkspaceState, requireVersions: boolean): Promise<void> {
-    const partition = userPartition(userId);
+function sameState(a: WorkspaceState, b: WorkspaceState): boolean {
+    return JSON.stringify(stableValue(a)) === JSON.stringify(stableValue(b));
+}
+
+function databaseRecordSize(id: string, record: WorkspaceRecord): number {
+    return Buffer.byteLength(JSON.stringify({ id, ...record }), 'utf8');
+}
+
+function enforceRecordSize(id: string, record: WorkspaceRecord): void {
+    if (databaseRecordSize(id, record) > MAX_WORKSPACE_BYTES) {
+        throw new InputValidationError(
+            'This workspace exceeds the current 220 KiB server-storage limit. Export it and reduce the stored records before retrying.'
+        );
+    }
+}
+
+function responseFor(record: WorkspaceRecord): Record<string, unknown> {
+    const state = {} as WorkspaceState;
+    const versions: Record<string, Record<string, string>> = {};
     for (const collection of COLLECTIONS) {
-        const records = state[collection];
-        const table = tableFor(collection, partition);
-        for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
-            await upsertBatch(table, records.slice(offset, offset + BATCH_SIZE), requireVersions);
-        }
+        state[collection] = record.state[collection].map(item => ({
+            ...item,
+            _version: record.workspaceVersion
+        }));
+        versions[collection] = Object.fromEntries(
+            state[collection].map(item => [String(item.id), record.workspaceVersion])
+        );
     }
-}
-
-async function readCollection(collection: CollectionName, partition: string) {
-    const response = await db.list<StoredRecord>(tableFor(collection, partition), {
-        limit: MAX_ITEMS_PER_COLLECTION
-    });
-    const items = response.items.map(item => ({
-        ...asRecord(item.payload),
-        id: item.sourceId || item.id,
-        _version: item.updatedAt
-    }));
-    return { items, hasMore: Boolean(response.nextToken) };
-}
-
-async function readBootstrapMarker(partition: string): Promise<BootstrapRecord | null> {
-    const [marker] = await db.get<BootstrapRecord>(metaTableFor(partition), ['bootstrap'], {
-        consistent: true
-    });
-    return marker;
-}
-
-async function getWorkspaceFor(userId: string) {
-    const partition = userPartition(userId);
-    const [ventures, tasks, integrations, capabilities, activity, marker] = await Promise.all([
-        readCollection('ventures', partition),
-        readCollection('tasks', partition),
-        readCollection('integrations', partition),
-        readCollection('capabilities', partition),
-        readCollection('activity', partition),
-        readBootstrapMarker(partition)
-    ]);
-    const collections = { ventures, tasks, integrations, capabilities, activity };
-    const truncated = COLLECTIONS.filter(collection => collections[collection].hasMore);
     return {
-        state: {
-            ventures: ventures.items,
-            tasks: tasks.items,
-            integrations: integrations.items,
-            capabilities: capabilities.items,
-            activity: activity.items
-        },
-        bootstrapStatus: marker?.status || 'none',
-        truncated
+        state,
+        bootstrapStatus: record.bootstrapStatus,
+        workspaceVersion: record.workspaceVersion,
+        versions
     };
 }
 
-function clientError(err: unknown): string {
-    if (err instanceof InputValidationError || err instanceof WorkspaceConflictError) return err.message;
-    return 'The workspace request could not be completed.';
+function emptyResponse(): Record<string, unknown> {
+    const versions: Record<string, Record<string, string>> = {};
+    for (const collection of COLLECTIONS) versions[collection] = {};
+    return {
+        state: emptyWorkspace(),
+        bootstrapStatus: 'none',
+        workspaceVersion: null,
+        versions
+    };
 }
 
-async function bootstrapWorkspace(
-    userId: string,
-    raw: unknown
-): Promise<{ status: number; body: Record<string, unknown> }> {
-    let state: WorkspaceState;
+async function readWorkspaceRecord(userId: string): Promise<WorkspaceRecord | null> {
+    const partition = userPartition(userId);
+    const [record] = await db.get<WorkspaceRecord>(
+        WORKSPACES_TABLE,
+        [workspaceId(userId)],
+        { consistent: true }
+    );
+    if (!record) return null;
+    if (record.ownerPartition !== partition) {
+        throw new WorkspaceStorageError('The workspace ownership check failed. No data was returned.');
+    }
+    if (record.schemaVersion !== 2 || record.bootstrapStatus !== 'complete' || !record.state) {
+        throw new WorkspaceStorageError('The stored workspace schema is incompatible. No automatic migration was attempted.');
+    }
+    return record;
+}
+
+function createWorkspaceRecord(userId: string, state: WorkspaceState): WorkspaceRecord {
+    return {
+        ownerPartition: userPartition(userId),
+        state,
+        updatedAt: new Date().toISOString(),
+        workspaceVersion: randomUUID(),
+        bootstrapStatus: 'complete',
+        schemaVersion: 2
+    };
+}
+
+async function bootstrapWorkspace(userId: string, raw: unknown): Promise<Record<string, unknown>> {
+    const state = validateWorkspace(raw);
+    const id = workspaceId(userId);
+    const existing = await readWorkspaceRecord(userId);
+    if (existing) {
+        if (sameState(existing.state, state)) return responseFor(existing);
+        throw new WorkspaceConflictError(
+            'This account already has a server workspace. The server copy is authoritative; reload before continuing.'
+        );
+    }
+
+    const candidate = createWorkspaceRecord(userId, state);
+    enforceRecordSize(id, candidate);
     try {
-        state = validateWorkspace(raw);
-    } catch (err) {
-        if (err instanceof InputValidationError) return { status: 400, body: { error: err.message } };
+        const [createdId] = await db.tx.add(WORKSPACES_TABLE, [{ id, ...candidate }]);
+        if (createdId) return responseFor(candidate);
+
+        const after = await readWorkspaceRecord(userId);
+        if (after && sameState(after.state, state)) return responseFor(after);
+        if (after) {
+            throw new WorkspaceConflictError(
+                'Another initialization created this account workspace. Reload to use the server copy.'
+            );
+        }
+        throw new WorkspaceStorageError(
+            'Workspace initialization could not be confirmed. Reload before retrying.'
+        );
+    } catch (err: unknown) {
+        if (err instanceof WorkspaceConflictError || err instanceof InputValidationError || err instanceof WorkspaceStorageError) {
+            throw err;
+        }
+        if (isAppDatabaseError(err) && err.code === 'AppDatabaseUnknownOutcome') {
+            try {
+                const after = await readWorkspaceRecord(userId);
+                if (after && sameState(after.state, state)) return responseFor(after);
+                if (after) {
+                    throw new WorkspaceConflictError(
+                        'Another initialization created this account workspace. Reload to use the server copy.'
+                    );
+                }
+            } catch (reconcileError: unknown) {
+                if (reconcileError instanceof WorkspaceConflictError) throw reconcileError;
+            }
+            throw new WorkspaceStorageError(
+                'The initialization result is unknown. Reload the workspace before retrying; no blind retry was attempted.'
+            );
+        }
         throw err;
     }
+}
 
-    const partition = userPartition(userId);
-    const meta = metaTableFor(partition);
-    let marker = await readBootstrapMarker(partition);
-    if (marker?.status === 'complete') {
-        return { status: 409, body: { error: 'This account workspace is already initialized; the server copy is authoritative.' } };
+async function updateWorkspace(userId: string, raw: unknown): Promise<Record<string, unknown>> {
+    const root = asRecord(raw);
+    const requestedVersion = root.workspaceVersion;
+    const state = validateWorkspace(raw);
+    const current = await readWorkspaceRecord(userId);
+    if (!current) {
+        throw new WorkspaceConflictError('Workspace initialization is required. Reload and sign in again.');
     }
-    if (!marker) {
-        await db.tx.add(meta, [{
-            id: 'bootstrap',
-            status: 'in_progress',
-            startedAt: new Date().toISOString()
-        }]);
-        marker = await readBootstrapMarker(partition);
+    if (typeof requestedVersion !== 'string' || !requestedVersion) {
+        throw new WorkspaceConflictError('The workspace version is missing. Refresh before saving.');
     }
-    if (marker?.status === 'complete') {
-        return { status: 409, body: { error: 'This account workspace is already initialized; the server copy is authoritative.' } };
-    }
-    if (marker?.status !== 'in_progress') {
-        return { status: 409, body: { error: 'Workspace bootstrap state is invalid. Inspect the workspace before retrying.' } };
+    if (current.workspaceVersion !== requestedVersion) {
+        if (sameState(current.state, state)) return responseFor(current);
+        throw new WorkspaceConflictError(
+            'A newer server workspace exists. Your local snapshot was retained; refresh before making further changes.'
+        );
     }
 
-    await writeWorkspace(userId, state, false);
-    const [completed] = await db.tx.update(meta, [{
-        id: 'bootstrap',
-        record: {
-            status: 'complete',
-            completedAt: new Date().toISOString()
-        },
-        if: { status: 'in_progress' }
-    }], { patch: true });
-    if (!completed) {
-        const finalMarker = await readBootstrapMarker(partition);
-        if (finalMarker?.status !== 'complete') {
-            throw new Error('Initialization could not be confirmed after writing records.');
+    const id = workspaceId(userId);
+    const candidate = createWorkspaceRecord(userId, state);
+    enforceRecordSize(id, candidate);
+    try {
+        const [updated] = await db.tx.update(WORKSPACES_TABLE, [{
+            id,
+            record: candidate as unknown as Record<string, unknown>,
+            if: {
+                ownerPartition: userPartition(userId),
+                workspaceVersion: current.workspaceVersion
+            }
+        }], { patch: true });
+
+        if (updated) return responseFor(candidate);
+
+        const after = await readWorkspaceRecord(userId);
+        if (after && sameState(after.state, state)) return responseFor(after);
+        throw new WorkspaceConflictError(
+            'The workspace changed while saving. Your local snapshot was retained; refresh before retrying.'
+        );
+    } catch (err: unknown) {
+        if (err instanceof WorkspaceConflictError || err instanceof InputValidationError || err instanceof WorkspaceStorageError) {
+            throw err;
         }
+        if (isAppDatabaseError(err) && err.code === 'AppDatabaseUnknownOutcome') {
+            try {
+                const after = await readWorkspaceRecord(userId);
+                if (after && sameState(after.state, state)) return responseFor(after);
+            } catch {
+                // Preserve the unresolved outcome; do not retry a possibly committed write.
+            }
+            throw new WorkspaceStorageError(
+                'The save outcome is unknown. Refresh before retrying; the server did not blindly repeat the write.'
+            );
+        }
+        throw err;
     }
-    return { status: 200, body: { ok: true, bootstrapStatus: 'complete' } };
+}
+
+function errorStatus(err: unknown): number {
+    if (err instanceof InputValidationError) return 400;
+    if (err instanceof WorkspaceConflictError) return 409;
+    if (err instanceof WorkspaceStorageError) return 503;
+    if (isAppDatabaseError(err)) {
+        if (err.code === 'AppDatabaseQuotaExceeded') return 429;
+        if (
+            err.code === 'AppDatabaseGatewayUnavailable' ||
+            err.code === 'AppDatabaseReadIncomplete' ||
+            err.code === 'AppDatabaseUnknownOutcome' ||
+            err.code === 'AppDatabaseCapabilityInvalid'
+        ) return 503;
+        if (
+            err.code === 'AppDatabaseConflict' ||
+            err.code === 'AppDatabaseConditionFailed' ||
+            err.code === 'AppDatabaseDuplicateId'
+        ) return 409;
+    }
+    return 500;
+}
+
+function clientError(err: unknown): string {
+    if (
+        err instanceof InputValidationError ||
+        err instanceof WorkspaceConflictError ||
+        err instanceof WorkspaceStorageError
+    ) return err.message;
+    if (isAppDatabaseError(err) && err.code === 'AppDatabaseQuotaExceeded') {
+        return 'Workspace storage quota exceeded. No save success is assumed.';
+    }
+    if (isAppDatabaseError(err) && err.code === 'AppDatabaseCapabilityInvalid') {
+        return 'Workspace storage is not provisioned for this release. No save success is assumed.';
+    }
+    if (
+        isAppDatabaseError(err) &&
+        ['AppDatabaseGatewayUnavailable', 'AppDatabaseReadIncomplete', 'AppDatabaseUnknownOutcome'].includes(err.code)
+    ) return 'Workspace storage is temporarily unavailable or the result is unresolved. Refresh before retrying.';
+    return 'The workspace request could not be completed.';
 }
 
 export const handler = router({
     'GET /api/health': [
-        async () => json({
-            ok: true,
-            service: 'ai-business-portfolio-api',
-            authRequiredForWorkspace: true
-        })
+        async () => {
+            try {
+                // This fixed-ID read checks the table catalog without exposing workspace records.
+                await db.get<WorkspaceRecord>(WORKSPACES_TABLE, ['health-probe'], { consistent: true });
+                return json({
+                    ok: true,
+                    service: 'ai-business-portfolio-api',
+                    databaseCatalogReady: true,
+                    authRequiredForWorkspace: true
+                });
+            } catch (err: unknown) {
+                console.error('workspace_database_healthcheck_failed', err);
+                return error('Workspace storage is not ready.', errorStatus(err));
+            }
+        }
     ],
     'GET /api/workspace': [
         requireAuth(),
         async (ctx) => {
             try {
-                return json(await getWorkspaceFor(ctx.user!.userId));
+                const record = await readWorkspaceRecord(ctx.user!.userId);
+                return json(record ? responseFor(record) : emptyResponse());
             } catch (err: unknown) {
                 console.error('workspace_read_failed', err);
-                return error('Could not read the authenticated workspace. No success is assumed.', 500);
+                return error(clientError(err), errorStatus(err));
             }
         }
     ],
@@ -322,14 +366,10 @@ export const handler = router({
         requireAuth(),
         async (ctx) => {
             try {
-                const result = await bootstrapWorkspace(ctx.user!.userId, ctx.body);
-                if (result.status >= 400) {
-                    return error(String(result.body.error || 'Workspace initialization failed.'), result.status);
-                }
-                return json(result.body);
+                return json(await bootstrapWorkspace(ctx.user!.userId, ctx.body));
             } catch (err: unknown) {
                 console.error('workspace_bootstrap_failed', err);
-                return error(clientError(err), err instanceof InputValidationError ? 400 : err instanceof WorkspaceConflictError ? 409 : 500);
+                return error(clientError(err), errorStatus(err));
             }
         }
     ],
@@ -337,27 +377,10 @@ export const handler = router({
         requireAuth(),
         async (ctx) => {
             try {
-                const partition = userPartition(ctx.user!.userId);
-                const marker = await readBootstrapMarker(partition);
-                if (marker?.status !== 'complete') {
-                    return error('Workspace bootstrap is not complete. Reload the workspace before saving.', 409);
-                }
-                const state = validateWorkspace(ctx.body);
-                await writeWorkspace(ctx.user!.userId, state, true);
-                const persisted = await getWorkspaceFor(ctx.user!.userId);
-                const versions: Record<string, Record<string, string>> = {};
-                for (const collection of COLLECTIONS) {
-                    versions[collection] = {};
-                    for (const item of persisted.state[collection]) {
-                        if (typeof item.id === 'string' && typeof item._version === 'string') {
-                            versions[collection][item.id] = item._version;
-                        }
-                    }
-                }
-                return json({ ok: true, syncedAt: new Date().toISOString(), versions });
+                return json(await updateWorkspace(ctx.user!.userId, ctx.body));
             } catch (err: unknown) {
                 console.error('workspace_sync_failed', err);
-                return error(clientError(err), err instanceof InputValidationError ? 400 : err instanceof WorkspaceConflictError ? 409 : 500);
+                return error(clientError(err), errorStatus(err));
             }
         }
     ]
