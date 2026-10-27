@@ -2,9 +2,11 @@
 
 ## Current prototype warning
 
-The initial interface is a static browser application. It stores its operational records in browser localStorage and renders them in the same client. A user can modify this state using browser tools. The prototype has no authentication, server-enforced authorization, tenant isolation, protected secret store, or independent audit service.
+The interface now requires AppDeploy sign-in to load the workspace and persists records to server-side collections partitioned by a SHA-256 hash of the verified AppDeploy user ID. API workspace routes call `requireAuth()` and derive the storage partition from `ctx.user.userId`; client-submitted user IDs are not used for routing data.
 
-Do not use this version to store real customer confidential data, access tokens, API keys, payment data, sensitive personal information, or regulated records. Do not describe its status labels as security enforcement or machine-verified facts.
+The browser still maintains local caches, and its initial bootstrap can import a legacy local portfolio to an empty account workspace. Client-side state and integration status labels remain user-editable. The app has not yet passed an independent multi-account isolation suite, and does not yet have an external workflow executor, managed provider credential registry, rate/cost controls, or a tamper-resistant standalone audit service.
+
+Do not store credentials, payment details, or regulated/highly sensitive customer records in portfolio notes. Do not describe a manually recorded integration state as machine-verified.
 
 ## Required controls before production data or real side effects
 
@@ -25,6 +27,7 @@ Do not use this version to store real customer confidential data, access tokens,
 
 ### Data isolation and privacy
 - Define data classification, lawful/authorized purpose, retention, deletion, export, and customer separation before ingesting production data.
+- Exercise cross-account isolation in CI with at least two distinct authenticated identities; the presence of hashed table names is not a substitute for that test.
 - Minimize collected and retained data.
 - Do not use shared global tables or logs without explicit tenant scoping and authorization.
 - Define cross-region transfer and residency constraints for each deployment.
