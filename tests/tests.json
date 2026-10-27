@@ -1,0 +1,43 @@
+[
+  {
+    "name": "Sign in and create a durable portfolio record",
+    "sanity": true,
+    "viewport": "desktop",
+    "covers": ["AppDeploy sign-in", "authenticated workspace load", "server-backed business record creation", "persistence after reload"],
+    "description": "Signs in, creates a synthetic portfolio record, and verifies it is loaded again from the account workspace after a full reload.",
+    "steps": ["Sign in using the AppDeploy authentication popup", "Open Businesses & products and create 'Persistence QA Record' with a non-empty purpose", "Wait until the workspace sync indicator shows Account synced", "Reload the page and wait for the workspace to load", "Search for 'Persistence QA Record'"],
+    "expected": "The synthetic record remains present after reload with its saved fields, and the workspace shows an account-synced state."
+  },
+  {
+    "name": "Reject an incomplete portfolio record",
+    "viewport": "mobile",
+    "covers": ["required business fields", "form validation", "invalid write prevention"],
+    "description": "Verifies that a business/product cannot be created without its required name, type, and intended outcome.",
+    "steps": ["Sign in and open New business / product", "Enter a name and type but leave Purpose and intended outcome blank", "Submit the form"],
+    "expected": "A visible validation error is shown and no incomplete record appears in the portfolio."
+  },
+  {
+    "name": "Persist a build task with its business association",
+    "viewport": "desktop",
+    "covers": ["build task creation", "acceptance criteria", "business-to-task association", "server-backed task persistence"],
+    "description": "Creates a synthetic task linked to a business record and verifies the link and task survive a refresh.",
+    "steps": ["Sign in and open Build board", "Create a task 'Persistence QA Task' with details and acceptance criteria", "Associate it with 'Persistence QA Record' if present, otherwise with the portfolio platform", "Wait for Account synced and reload the page", "Open Build board and locate 'Persistence QA Task'"],
+    "expected": "The task remains present after reload with the same association, status, priority, and acceptance criteria."
+  },
+  {
+    "name": "Keep provider candidates separate from live connections",
+    "viewport": "desktop",
+    "covers": ["integration registry persistence", "candidate versus verified distinction", "explicit provider connection state"],
+    "description": "Verifies candidate providers remain unconnected until an operator records tested evidence; the test does not call a third-party provider.",
+    "steps": ["Sign in and open Integrations", "Inspect n8n and OpenAI API records", "Verify the Verified count remains zero unless separate test evidence exists"],
+    "expected": "Candidate providers are visible as candidates and no connection is inferred from their documentation links."
+  },
+  {
+    "name": "Keep one account's portfolio private from another account",
+    "viewport": "desktop",
+    "covers": ["server-side account partitioning", "sign-out", "second-account isolation", "no cross-account record exposure"],
+    "description": "Uses separate synthetic test actors to check that server records written under one authenticated account are not returned to another account.",
+    "steps": ["Actor A signs in and creates 'Actor A Private QA Record'", "Wait for Account synced, then sign out", "Actor B signs in with a different test account", "Search for 'Actor A Private QA Record'", "Inspect Actor B's workspace and verify the record is absent"],
+    "expected": "Actor B cannot see or modify Actor A's record; each actor receives only records from their own authenticated workspace."
+  }
+]
