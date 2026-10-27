@@ -138,6 +138,12 @@ def main() -> int:
         fail("workspace API must derive data partitioning from the authenticated user")
     if "'GET /api/workspace'" not in backend_source or "'PUT /api/workspace'" not in backend_source:
         fail("authenticated workspace read/write routes are missing")
+    if "const WORKSPACES_TABLE = 'abp_workspaces';" not in backend_source:
+        fail("workspace persistence must use the fixed AppDeploy table catalog")
+    if "workspaceVersion" not in backend_source or "workspaceVersion" not in main_source:
+        fail("versioned workspace compare-and-swap is missing")
+    if "function tableFor(" in backend_source:
+        fail("dynamic per-user database table names are forbidden")
 
     node = shutil.which("node")
     if node:

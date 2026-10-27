@@ -129,3 +129,28 @@
 - Direct browser navigation to API URLs returned the app shell and did not expose raw responses; the relevant 401 evidence came from AppDeploy backend runtime diagnostics.
 - Database bootstrap, storage catalog behavior, partial bootstrap recovery, database quotas, and restore/retention behavior remain to be verified with an authenticated account.
 - External provider integrations and workflow execution remain disabled.
+
+
+## 2026-10-27 — Fixed-table atomic workspace storage repair
+
+### Change prepared in repository
+
+- Replaced dynamically generated per-user database table names with the single fixed logical table abp_workspaces. Each account row key is derived from the authenticated AppDeploy user ID; client-supplied identifiers do not choose the account partition.
+- Replaced multi-table bootstrap with one chosen-ID insert for the complete account workspace. A concurrent bootstrap cannot overwrite a workspace that already won the insert.
+- Added a server-issued workspaceVersion and conditional update. Stale clients receive HTTP 409; uncertain outcomes are reconciled with consistent reads instead of blind retries.
+- Full-state replacement makes removed records remain removed after reload. The backend strips client _version metadata before persistence.
+- Added a public fixed-ID database-catalog health probe that does not return account content.
+- Enforced a 220 KiB serialized workspace-row ceiling and 100 records per collection. Exceeding the ceiling returns a visible validation error rather than attempting an oversized database write.
+- Updated the frontend to send/retain workspaceVersion and updated regression checks, acceptance tests, architecture, security, roadmap, and README.
+- This is a schema transition from the earlier dynamically named collection design. No authenticated server write/read test has been demonstrated for the previous implementation; legacy server-data migration is not verified.
+
+### Verification gates (mark only from actual results)
+
+- [ ] GitHub Actions validator passes on the new commit.
+- [ ] AppDeploy backend compilation and deployment are ready.
+- [ ] GET /api/health confirms that abp_workspaces is provisioned and readable.
+- [ ] An authenticated account bootstraps, creates/edits records, reloads, and retains data.
+- [ ] A stale-version write is rejected without losing the newer server state.
+- [ ] Two separate authenticated accounts demonstrate isolation.
+
+The current implementation does not add provider execution, backup/restore, account deletion/retention, or a tamper-resistant audit service.

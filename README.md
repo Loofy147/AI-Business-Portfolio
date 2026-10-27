@@ -8,7 +8,7 @@ This repository is the source of truth for the product specification, implementa
 
 **[Open the AI Business Portfolio workspace](https://ai-business-portfolio-0yfidw.v2.appdeploy.ai/)**
 
-The first release is a self-contained browser prototype. Records use localStorage in the current browser; the deployment is not yet a multi-user source of truth, no external provider is connected, and operator-entered integration statuses are not independently verified. Do not store credentials or real customer-sensitive data in this version.
+The deployed app has an AppDeploy sign-in gate and an account-scoped server workspace. Browser storage is a per-account cache and one-time bootstrap source, not the system of record. Authenticated persistence and two-account isolation still require end-to-end proof; use synthetic, non-sensitive data until those gates pass. No external provider is connected, and operator-entered integration statuses are not independently verified. Never store credentials in this portfolio.
 
 - Source: [GitHub repository](https://github.com/Loofy147/AI-Business-Portfolio)
 - Latest passing validation run: [GitHub Actions run #3](https://github.com/Loofy147/AI-Business-Portfolio/actions/runs/40494345607)
@@ -54,7 +54,7 @@ Conversation text and vendor marketing do not, by themselves, prove implementati
 ├── src/
 │   └── main.ts                 # UI, AppDeploy auth, and remote workspace sync
 ├── backend/
-│   └── index.ts                # Authenticated user-partitioned workspace API
+│   └── index.ts                # Authenticated fixed-table workspace API
 ├── tests/
 │   └── tests.json              # AppDeploy end-to-end acceptance tests
 ├── README.md
@@ -71,7 +71,7 @@ Conversation text and vendor marketing do not, by themselves, prove implementati
         └── validate.yml
 ```
 
-The UI is bundled for AppDeploy and uses the AppDeploy authentication/API client. After sign-in, records are persisted server-side in user-partitioned collections; the first account bootstrap can import the current browser's legacy portfolio when the server workspace is empty. The browser cache remains a convenience, not the system of record. External providers are still candidates and no workflow runs against them yet. Tenant-isolation tests, database recovery, operational observability, and independent production hardening remain open.
+The UI uses the AppDeploy authentication/API client. The backend stores one atomic workspace document per authenticated account in the fixed logical table abp_workspaces; the row key is derived from the authenticated AppDeploy user ID, and client-supplied identifiers do not select the account partition. A successful sync replaces the full state, so removed records remain removed after reload. Optimistic workspace-version checks reject stale writes rather than silently overwriting newer state. The current storage ceiling is 220 KiB per account workspace and 100 records per collection. First sign-in can import a legacy browser workspace. External providers remain candidates and no workflow runs against them yet. Authenticated persistence, database-catalog readiness, two-account isolation, recovery, backup/restore, and operational hardening remain open verification gates.
 
 ## Run locally
 

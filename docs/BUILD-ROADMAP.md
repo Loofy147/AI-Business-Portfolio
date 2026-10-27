@@ -27,8 +27,14 @@ The roadmap tracks software and business delivery, not market-research completio
 - [x] Select AppDeploy as the current hosted UI/API boundary and AppDeploy database SDK for scoped persistence.
 - [x] Add AppDeploy authentication, sign-in/out, and protected workspace routes.
 - [ ] Define workspace membership and role model.
-- [x] Move portfolio collections to server-backed, account-partitioned persistence; retain browser storage as account cache and one-time legacy bootstrap source.
-- [x] Add payload/collection size checks, ID validation, duplicate-ID rejection, and version checks.
+- [x] Store the full account workspace in one fixed logical table using a deterministic hash-derived row key; do not create per-user table catalogs or scan other tenants' rows.
+- [x] Make sync a versioned conditional replacement of the full workspace document; removed records are persisted and stale writes reject with a conflict.
+- [x] Make bootstrap a single-row insert so initialization is atomic rather than a multi-table partial-write sequence.
+- [x] Add a database-catalog health probe that does not return account records.
+- [ ] Verify that the fixed table catalog is ready and test authenticated first login, bootstrap, write/read/reload against a real account.
+- [ ] Verify stale-version conflicts, a fresh browser session, and two-account isolation end to end.
+- [x] Add payload/collection size checks, ID validation, duplicate-ID rejection, and workspace-level optimistic version checks.
+- [x] Enforce a 220 KiB stored workspace ceiling and 100-record per-collection limit with visible API errors.
 - [ ] Add versioned schema migrations and a tested restore path.
 - [x] Protect current workspace read, bootstrap, and sync routes with requireAuth and derive per-user storage partition from the verified auth user.
 - [ ] Add independent two-user authorization tests and server-side roles/administrative policies.
@@ -41,6 +47,7 @@ The roadmap tracks software and business delivery, not market-research completio
 - Two test identities cannot read, mutate, or infer each other's private records.
 - Authorization tests cover unauthenticated and unauthorized paths.
 - Records survive a new browser and session.
+- A removed record stays removed after reload; stale workspace versions are rejected without silent overwrite.
 - Migration and rollback/recovery have a repeatable test.
 - No secret appears in browser storage, logs, or responses.
 

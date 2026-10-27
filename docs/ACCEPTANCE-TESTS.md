@@ -26,6 +26,17 @@ This is a static/structural check. It does not simulate a real browser or prove 
 9. Verify no external script, CSS, or API request is required for the core UI to load.
 10. Verify prototype disclaimer remains visible and does not imply shared persistence or secured authorization.
 
+## Authenticated storage verification gate (not yet proven end to end)
+
+1. Confirm GET /api/health returns ok=true and databaseCatalogReady=true without exposing account records.
+2. Sign in with an account whose server workspace is uninitialized; verify bootstrap from browser state/default records succeeds atomically.
+3. Create and edit a disposable record, wait for Account synced, reload, and verify fields persist. Remove or archive a disposable record where supported and verify the changed state persists after reload.
+4. In two separate sessions, use distinct test accounts and prove neither account can read or modify the other account's records.
+5. Submit a stale workspaceVersion from a second tab and verify the server returns a conflict, leaves the newer server copy intact, and the UI retains a recovery snapshot.
+6. In a test environment, force database-unavailable or unknown-outcome conditions; verify the UI reports unresolved status and the server does not blindly repeat the write.
+
+A test definition or successful public health probe is not proof that authenticated persistence works. Mark a gate complete only after capturing an actual run, account setup, deployment version, commit SHA, and observable outcome.
+
 ## Required tests before production
 
 ### Identity and authorization
@@ -36,8 +47,9 @@ This is a static/structural check. It does not simulate a real browser or prove 
 
 ### Persistence and concurrency
 - Create/read/update/delete survives a new browser session.
-- Concurrent edits cannot silently overwrite important changes.
-- Duplicate requests use stable idempotency receipts.
+- Concurrent edits cannot silently overwrite important changes; the current single-document model rejects stale workspace versions.
+- Full-state replacement persists removals rather than resurrecting stale records.
+- Duplicate requests use stable idempotency receipts for future non-idempotent workflow actions.
 - Missing, incomplete, or stale reads are not interpreted as proof of absence.
 - Migrations and schema rollback are rehearsed using recoverable data.
 
