@@ -79,3 +79,8 @@ For a suspected vulnerability, preserve relevant non-sensitive evidence, avoid e
 ## Production-readiness gate
 
 Do not call a product production-ready until identity, tenant isolation, least-privilege secrets, server-side policy, security tests, dependency/license review, observability, backup/restore, incident runbooks, and rollback have been exercised for the actual deployment. A checklist alone is not proof.
+
+
+## Atomic workspace persistence (2026-10-27)
+
+The workspace API uses the authenticated AppDeploy user ID to derive an opaque row key in the fixed abp_workspaces logical table. The client cannot select a user partition. Writes carry a server-issued workspaceVersion and use a conditional update; stale versions are rejected. The stored state is replaced as a single document, so removed records are not silently ignored. The current persisted row is capped at 220 KiB. This ceiling is not a backup, restore, retention, or account-deletion guarantee. First-login bootstrap, database-catalog readiness, authenticated persistence, and two-account isolation remain open until live end-to-end evidence is captured.
