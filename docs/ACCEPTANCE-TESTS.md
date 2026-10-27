@@ -16,6 +16,7 @@ This is a static/structural check. It does not simulate a real browser or prove 
 
 1. Open `index.html` on desktop and narrow/mobile viewport; verify navigation and layout remain usable.
 2. Create a business/product with required fields. Edit it and change its status. Refresh and verify the record remains in the same browser.
+3. Archive a disposable business/product record; verify typing `ARCHIVE` is required, the record remains visible as Archived, and Change state can restore it without losing its tasks.
 3. Search by name and outcome, then filter by lifecycle state.
 4. Add a task with acceptance criteria; change its state and verify build progress changes.
 5. Add an integration and record candidate/configured/tested/verified state. Confirm the UI explains evidence is operator-entered, not independently run.
