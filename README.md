@@ -21,7 +21,7 @@ Build reusable capabilities once, then assemble them into independent businesses
 
 The first slice is a portfolio command center with:
 
-- **Portfolio register** — business/product records, lifecycle state, owner, region coverage, operating status, and next execution step.
+- **Portfolio register** — business/product records, lifecycle state, owner, region coverage, operating status, next execution step, and reversible archiving.
 - **Build board** — scoped implementation work, priorities, dependencies, acceptance criteria, and evidence states.
 - **Integration registry** — provider candidates, official documentation, credential/configuration state, test evidence, costs, and known constraints. A listing never implies a working connection.
 - **Reusable capability catalog** — shared identity, workflow, communication, data, billing, analytics, AI, and deployment components.
