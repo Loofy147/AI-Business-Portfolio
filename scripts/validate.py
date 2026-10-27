@@ -12,6 +12,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 INDEX = ROOT / "index.html"
+MAIN = ROOT / "src" / "main.ts"
+BACKEND = ROOT / "backend" / "index.ts"
 REQUIRED_PATHS = [
     ROOT / "README.md",
     ROOT / "SECURITY.md",
@@ -20,6 +22,8 @@ REQUIRED_PATHS = [
     ROOT / "docs" / "INTEGRATION-STANDARDS.md",
     ROOT / "docs" / "OPERATING-MODEL.md",
     ROOT / "scripts" / "validate.py",
+    MAIN,
+    BACKEND,
 ]
 REQUIRED_MARKERS = [
     'id="app"',
@@ -41,6 +45,9 @@ REQUIRED_MARKERS = [
     "function openArchiveForm",
     "status-archived",
     "ai-business-portfolio.v0.1",
+    "sign-in",
+    "renderAuthGate",
+    "syncWorkspaceNow",
 ]
 
 
@@ -96,8 +103,11 @@ def main() -> int:
         fail("index.html is missing")
 
     source = INDEX.read_text(encoding="utf-8")
+    main_source = MAIN.read_text(encoding="utf-8") if MAIN.is_file() else ""
+    backend_source = BACKEND.read_text(encoding="utf-8") if BACKEND.is_file() else ""
+    combined_source = source + "\\n" + main_source + "\\n" + backend_source
     for marker in REQUIRED_MARKERS:
-        if marker not in source:
+        if marker not in combined_source:
             fail(f"required application marker is missing: {marker}")
 
     audit = DocumentAudit()
@@ -116,14 +126,20 @@ def main() -> int:
     if audit.external_scripts:
         fail("the initial UI must not load remote scripts")
 
-    scripts = re.findall(r"<script(?:\s[^>]*)?>(.*?)</script\s*>", source, flags=re.I | re.S)
-    if len(scripts) != 1:
-        fail(f"expected exactly one inline application script; found {len(scripts)}")
+    module_scripts = re.findall(r'<script[^>]+src=["\\']\\.\\/src\\/main\\.ts["\\'][^>]*>\\s*</script\\s*>', source, flags=re.I)
+    if len(module_scripts) != 1 or "<script>" in source:
+        fail("index.html must load src/main.ts and contain no inline application script")
+    if "import { api, auth }" not in main_source:
+        fail("frontend must use the AppDeploy auth/API client")
+    if "requireAuth()" not in backend_source or "ctx.user!.userId" not in backend_source:
+        fail("workspace API must derive data partitioning from the authenticated user")
+    if "'GET /api/workspace'" not in backend_source or "'PUT /api/workspace'" not in backend_source:
+        fail("authenticated workspace read/write routes are missing")
 
     node = shutil.which("node")
     if node:
-        with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8", delete=False) as tmp:
-            tmp.write(scripts[0])
+        with tempfile.NamedTemporaryFile("w", suffix=".mjs", encoding="utf-8", delete=False) as tmp:
+            tmp.write(main_source)
             temp_path = Path(tmp.name)
         try:
             result = subprocess.run(
@@ -136,7 +152,7 @@ def main() -> int:
                 print(result.stdout, end="")
                 print(result.stderr, end="")
                 fail("JavaScript syntax check failed")
-            print("PASS: embedded JavaScript syntax (node --check)")
+            print("PASS: frontend module syntax (node --check)")
         finally:
             temp_path.unlink(missing_ok=True)
     else:
@@ -146,7 +162,8 @@ def main() -> int:
     print(f"PASS: required application markers ({len(REQUIRED_MARKERS)})")
     print(f"PASS: HTML title and {len(audit.ids)} unique static IDs")
     print("PASS: no remote script or external stylesheet dependency")
-    print("NOTE: this check does not replace browser, accessibility, authorization, or end-to-end tests.")
+    print("PASS: authenticated backend route and user-partition invariants")
+    print("NOTE: this check does not replace TypeScript compilation, browser, accessibility, tenant-isolation, or end-to-end tests.")
     return 0
 
 
