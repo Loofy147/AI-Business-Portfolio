@@ -126,7 +126,7 @@ def main() -> int:
     if audit.external_scripts:
         fail("the initial UI must not load remote scripts")
 
-    module_scripts = re.findall(r'<script[^>]+src=["\\']\\.\\/src\\/main\\.ts["\\'][^>]*>\\s*</script\\s*>', source, flags=re.I)
+    module_scripts = re.findall(r"<script[^>]+src=['\\"]\\./src/main\\.ts['\\"][^>]*>\\s*</script\\s*>", source, flags=re.I)
     if len(module_scripts) != 1 or "<script>" in source:
         fail("index.html must load src/main.ts and contain no inline application script")
     if "import { api, auth }" not in main_source:
