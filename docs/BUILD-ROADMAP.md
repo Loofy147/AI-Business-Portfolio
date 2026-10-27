@@ -31,7 +31,8 @@ The roadmap tracks software and business delivery, not market-research completio
 - [x] Make sync a versioned conditional replacement of the full workspace document; removed records are persisted and stale writes reject with a conflict.
 - [x] Make bootstrap a single-row insert so initialization is atomic rather than a multi-table partial-write sequence.
 - [x] Add a database-catalog health probe that does not return account records.
-- [ ] Verify that the fixed table catalog is ready and test authenticated first login, bootstrap, write/read/reload against a real account.
+- [x] Confirm the fixed table catalog is readable on the deployed app (health endpoint HTTP 200, databaseCatalogReady=true; deployment snapshot 1793124102008).
+- [ ] Test authenticated first login, bootstrap, write/read/reload against a real account.
 - [ ] Verify stale-version conflicts, a fresh browser session, and two-account isolation end to end.
 - [x] Add payload/collection size checks, ID validation, duplicate-ID rejection, and workspace-level optimistic version checks.
 - [x] Enforce a 220 KiB stored workspace ceiling and 100-record per-collection limit with visible API errors.
