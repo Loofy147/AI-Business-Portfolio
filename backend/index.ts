@@ -140,9 +140,6 @@ async function upsertBatch(
             if (prior && requireVersions && source._version !== prior.updatedAt) {
                 throw new WorkspaceConflictError('This record changed on the server. Keep the local conflict snapshot and reload before retrying.');
             }
-            if (prior && typeof source._version === 'string' && source._version !== prior.updatedAt) {
-                throw new WorkspaceConflictError('This record changed on the server. Keep the local conflict snapshot and reload before retrying.');
-            }
 
             const value = {
                 sourceId,
@@ -360,7 +357,7 @@ export const handler = router({
                 return json({ ok: true, syncedAt: new Date().toISOString(), versions });
             } catch (err: unknown) {
                 console.error('workspace_sync_failed', err);
-                return error(clientError(err), err instanceof InputValidationError ? 400 : 500);
+                return error(clientError(err), err instanceof InputValidationError ? 400 : err instanceof WorkspaceConflictError ? 409 : 500);
             }
         }
     ]
