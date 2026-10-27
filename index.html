@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0e13">
+  <meta name="description" content="A build-first command center for developing and operating a portfolio of global AI-enabled businesses.">
+  <title>AI Business Portfolio — Build Console</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b0e13;
+      --panel: #11161f;
+      --panel2: #151b25;
+      --panel3: #1a222d;
+      --line: #293240;
+      --line2: #344052;
+      --text: #edf2f8;
+      --muted: #9aa6b8;
+      --dim: #69778b;
+      --accent: #b8f36b;
+      --accent-soft: #202e18;
+      --blue: #8fc7ff;
+      --amber: #edc16a;
+      --red: #ff929a;
+      --green: #a9e98a;
+      --radius: 14px;
+      --shadow: 0 16px 50px rgba(0,0,0,.25);
+    }
+    * { box-sizing: border-box; }
+    html { min-width: 320px; scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    button, input, select, textarea { font: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    a { color: inherit; }
+    a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    ::selection { background: #b8f36b33; }
+    .app { min-height: 100vh; }
+    .sidebar { position: fixed; z-index: 20; top: 0; bottom: 0; left: 0; width: 250px; display: flex; flex-direction: column; padding: 22px 15px 14px; background: #0e1219; border-right: 1px solid #222a35; }
+    .brand { display: flex; gap: 11px; align-items: center; padding: 0 7px 24px; }
+    .brand-icon { display: grid; place-items: center; width: 38px; height: 38px; color: #17200f; background: var(--accent); border-radius: 11px; font-weight: 900; font-size: 20px; box-shadow: 0 0 28px #b8f36b12; }
+    .brand strong { display: block; font-size: 14px; letter-spacing: -.035em; }
+    .brand span { display: block; color: var(--dim); font-size: 9px; letter-spacing: .14em; margin-top: 3px; }
+    .workspace-chip { display: flex; align-items: center; gap: 10px; padding: 11px; border: 1px solid var(--line); border-radius: 11px; background: #151a23; margin-bottom: 26px; }
+    .workspace-letter { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 9px; background: #24331c; color: var(--accent); font-weight: 800; }
+    .workspace-chip div:nth-child(2) { min-width: 0; flex: 1; }
+    .workspace-chip strong, .workspace-chip small { display: block; }
+    .workspace-chip strong { font-size: 11px; }
+    .workspace-chip small { font-size: 10px; color: var(--muted); margin-top: 3px; }
+    .side-label { margin: 0 10px 9px; color: #69768a; font-size: 9px; letter-spacing: .15em; font-weight: 700; }
+    .nav { display: grid; gap: 4px; }
+    .nav button { display: flex; align-items: center; gap: 11px; width: 100%; text-align: left; min-height: 42px; padding: 10px 12px; color: #9ba7b8; background: transparent; border: 1px solid transparent; border-radius: 9px; font-size: 12px; }
+    .nav button:hover { background: #171d27; color: var(--text); }
+    .nav button.active { color: #e2f9cb; background: #1a2517; border-color: #34472a; box-shadow: inset 2px 0 var(--accent); }
+    .nav-icon { display: grid; place-items: center; width: 20px; color: currentColor; font-size: 16px; }
+    .nav-label { flex: 1; }
+    .nav-count { min-width: 21px; text-align: center; padding: 2px 5px; border-radius: 5px; color: #f3d996; background: #352d1c; font-size: 10px; }
+    .side-divider { height: 1px; background: #242c37; margin: 23px 9px; }
+    .side-health { display: grid; gap: 13px; padding: 5px 8px; }
+    .health-row { display: grid; grid-template-columns: 20px 1fr; gap: 8px; color: #8e9bad; font-size: 10px; }
+    .health-row b { grid-column: 2; font-size: 10px; font-weight: 600; color: #c2cbd7; margin-top: -5px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; }
+    .dot.green { color: var(--accent); }
+    .dot.amber { color: var(--amber); }
+    .side-spacer { flex: 1; min-height: 18px; }
+    .safety-note { padding: 12px; background: #151b22; border: 1px solid #303946; border-radius: 11px; margin-bottom: 14px; }
+    .safety-note strong { display: block; font-size: 10px; color: #e3e9f2; }
+    .safety-note p { color: #8592a5; font-size: 10px; line-height: 1.65; margin: 6px 0 0; }
+    .side-footer { display: flex; align-items: center; gap: 9px; border-top: 1px solid #252d38; padding: 13px 4px 0; color: #748196; font: 9px ui-monospace, monospace; }
+    .main { min-width: 0; margin-left: 250px; display: flex; flex-direction: column; min-height: 100vh; }
+    .topbar { position: sticky; z-index: 10; top: 0; height: 64px; flex: 0 0 64px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 32px; border-bottom: 1px solid #242c37; background: #0c1016ee; backdrop-filter: blur(16px); }
+    .crumb { display: flex; align-items: center; gap: 9px; color: #7d899b; font-size: 11px; }
+    .crumb b { color: #e0e7f1; font-weight: 600; }
+    .top-actions { display: flex; align-items: center; gap: 11px; }
+    .global-pill { display: inline-flex; align-items: center; gap: 7px; padding: 6px 10px; border: 1px solid #303946; border-radius: 30px; color: #c2cbd8; background: #151b24; font-size: 10px; }
+    .top-sep { height: 22px; width: 1px; background: #303845; }
+    .icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: #96a2b4; }
+    .icon-btn:hover { color: var(--text); border-color: #344052; background: #1b222d; }
+    .menu-btn { display: none; }
+    .page { width: 100%; max-width: 1530px; margin: 0 auto; padding: 30px 32px 48px; flex: 1; }
+    .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; margin-bottom: 24px; }
+    .eyebrow { display: flex; align-items: center; gap: 8px; color: #a5b3c4; font: 10px ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .14em; text-transform: uppercase; }
+    .eyebrow .dot { width: 6px; height: 6px; }
+    h1, h2, h3, p { overflow-wrap: anywhere; }
+    h1 { margin: 13px 0 9px; font-size: clamp(29px, 3.15vw, 43px); line-height: 1.12; letter-spacing: -.055em; font-weight: 750; }
+    h1 span { color: var(--accent); }
+    .page-head p { max-width: 730px; color: var(--muted); font-size: 12px; line-height: 1.75; margin: 0; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 37px; padding: 0 13px; border: 1px solid transparent; border-radius: 9px; font-size: 11px; font-weight: 700; white-space: nowrap; transition: background .15s ease, border-color .15s ease, transform .15s ease; }
+    .btn:hover:not(:disabled) { transform: translateY(-1px); }
+    .btn-primary { background: var(--accent); color: #17200f; border-color: #c8ff85; }
+    .btn-primary:hover:not(:disabled) { background: #c9ff89; }
+    .btn-secondary { background: #191f29; border-color: #354051; color: #dce4ee; }
+    .btn-secondary:hover:not(:disabled) { background: #232c38; }
+    .btn-quiet { background: transparent; border-color: #303948; color: #adb8c8; }
+    .btn-sm { min-height: 30px; padding: 0 9px; border-radius: 7px; font-size: 10px; }
+    .stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 12px; margin-bottom: 17px; }
+    .stat { border: 1px solid var(--line); border-radius: 12px; padding: 16px; background: linear-gradient(145deg,#151a23,#11151c); min-width: 0; }
+    .stat-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: #9ba7b8; font-size: 10px; }
+    .stat-icon { font-size: 17px; color: #8795a8; }
+    .stat-value { display: flex; align-items: baseline; gap: 9px; margin: 18px 0 11px; font-size: 29px; line-height: 1; letter-spacing: -.06em; font-weight: 750; }
+    .stat-value small { color: #8491a4; font-size: 9px; letter-spacing: 0; font-weight: 400; }
+    .stat-foot { border-top: 1px solid #29313d; padding-top: 11px; color: #7e8b9e; font-size: 9px; line-height: 1.6; min-height: 31px; }
+    .grid-2 { display: grid; grid-template-columns: minmax(0,1.5fr) minmax(285px,1fr); gap: 15px; }
+    .panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); min-width: 0; overflow: hidden; }
+    .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 18px 19px; border-bottom: 1px solid #29313c; }
+    .panel-head h2 { margin: 0; font-size: 13px; letter-spacing: -.02em; }
+    .panel-head p { margin: 5px 0 0; color: #8491a3; font-size: 10px; line-height: 1.6; }
+    .text-btn { display: inline-flex; align-items: center; gap: 6px; padding: 3px 0; color: var(--accent); border: 0; background: none; font-size: 10px; font-weight: 600; white-space: nowrap; }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; text-align: left; }
+    th { background: #131923; border-bottom: 1px solid #29313d; color: #748196; padding: 11px 13px; font: 9px ui-monospace, monospace; text-transform: uppercase; letter-spacing: .08em; white-space: nowrap; }
+    td { border-bottom: 1px solid #242d38; padding: 13px; color: #c4cedb; font-size: 10px; vertical-align: middle; }
+    tr:last-child td { border-bottom: 0; }
+    .venture-cell { display: flex; align-items: center; gap: 9px; min-width: 185px; }
+    .venture-icon { display: grid; place-items: center; flex: 0 0 31px; width: 31px; height: 31px; border-radius: 8px; background: #1c2718; border: 1px solid #334629; color: var(--accent); font-size: 12px; font-weight: 800; }
+    .venture-cell strong { display: block; color: #e4eaf3; font-size: 10px; font-weight: 650; }
+    .venture-cell small { display: block; color: #768499; font-size: 9px; margin-top: 4px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 7px; border: 1px solid; border-radius: 30px; font-size: 9px; white-space: nowrap; }
+    .badge .dot { width: 5px; height: 5px; }
+    .status-planned { color: #a6b4c7; background: #1b222d; border-color: #354052; }
+    .status-building { color: #eac779; background: #302818; border-color: #594926; }
+    .status-validating { color: #95cdf9; background: #172935; border-color: #315166; }
+    .status-launched { color: #b8f36b; background: #1a2a14; border-color: #3a542c; }
+    .status-paused { color: #c5aff7; background: #282039; border-color: #45376b; }
+    .status-blocked { color: #ff9da4; background: #301c21; border-color: #62333b; }
+    .quiet { color: #7e8ca0; }
+    .action-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .side-stack { display: grid; gap: 15px; align-content: start; }
+    .control-list { padding: 3px 18px; }
+    .control { display: grid; grid-template-columns: 29px minmax(0,1fr) auto; gap: 10px; align-items: start; padding: 13px 0; border-bottom: 1px solid #27303b; }
+    .control:last-child { border-bottom: 0; }
+    .control-icon { width: 29px; height: 29px; display: grid; place-items: center; background: #1b222c; border: 1px solid #303b49; border-radius: 8px; color: #a4b1c3; }
+    .control strong { display: block; color: #dce4ee; font-size: 10px; }
+    .control p { margin: 4px 0 0; color: #7e8b9f; font-size: 9px; line-height: 1.65; }
+    .ok { color: var(--accent); font-size: 14px; }
+    .pending { color: var(--amber); font-size: 13px; }
+    .banner { display: flex; align-items: flex-start; gap: 11px; margin-top: 15px; padding: 13px 15px; border: 1px solid #3e3826; border-radius: 11px; background: #211f18; color: var(--amber); }
+    .banner > span { font-size: 16px; }
+    .banner strong { display: block; color: #ead6a3; font-size: 10px; margin-bottom: 3px; }
+    .banner p { margin: 0; color: #b2a584; font-size: 10px; line-height: 1.7; }
+    .callout { display: flex; align-items: center; gap: 14px; margin-top: 15px; padding: 17px; border: 1px solid #34462a; border-radius: 12px; background: linear-gradient(105deg,#192317,#141a1c); }
+    .callout-icon { display: grid; place-items: center; flex: 0 0 40px; height: 40px; width: 40px; color: var(--accent); background: #25371d; border-radius: 10px; font-size: 19px; }
+    .callout-content { flex: 1; min-width: 0; }
+    .callout strong { display: block; font-size: 12px; color: #e5f2dc; }
+    .callout p { margin: 5px 0 0; color: #9bac92; font-size: 10px; line-height: 1.65; }
+    .section-head { margin-bottom: 20px; }
+    .section-head h1 { font-size: clamp(28px,3vw,38px); }
+    .toolbar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 20px 0 14px; }
+    .search { display: flex; align-items: center; gap: 9px; height: 39px; width: min(470px,100%); min-width: 180px; flex: 1; padding: 0 11px; border: 1px solid #303a48; border-radius: 9px; background: #131922; color: #79879a; }
+    .search input { min-width: 0; flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font-size: 11px; }
+    .search input::placeholder { color: #68758a; }
+    .select { background: #131922; border: 1px solid #303a48; color: #aab6c7; border-radius: 8px; min-height: 38px; padding: 0 10px; font-size: 10px; }
+    .result-count { color: #7e8b9e; font-size: 10px; white-space: nowrap; }
+    .venture-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 13px; }
+    .venture-card { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 13px; padding: 17px; background: linear-gradient(150deg,#151b24,#11161e); min-width: 0; }
+    .venture-card-top { display: flex; align-items: flex-start; gap: 11px; }
+    .venture-card-top .venture-icon { width: 38px; height: 38px; flex-basis: 38px; font-size: 14px; border-radius: 10px; }
+    .venture-title { min-width: 0; flex: 1; }
+    .venture-title h3 { margin: 2px 0 6px; font-size: 14px; letter-spacing: -.02em; }
+    .venture-title small { display: block; color: #8290a3; font-size: 10px; }
+    .venture-card > p { min-height: 51px; color: #9aa6b7; font-size: 10px; line-height: 1.7; margin: 16px 0; }
+    .venture-meta { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; padding: 13px 0; border-top: 1px solid #29313c; border-bottom: 1px solid #29313c; }
+    .meta-label { display: block; color: #6f7e91; font: 9px ui-monospace,monospace; text-transform: uppercase; letter-spacing: .06em; }
+    .meta-value { display: block; margin-top: 5px; color: #c4cedb; font-size: 10px; }
+    .next-step { margin-top: 13px; border-left: 2px solid #7da64c; padding-left: 10px; }
+    .next-step strong { display: block; color: #c6d2bd; font-size: 9px; }
+    .next-step span { display: block; margin-top: 4px; color: #9ca991; font-size: 10px; line-height: 1.55; }
+    .card-actions { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
+    .build-layout { display: grid; grid-template-columns: minmax(0,1.35fr) minmax(265px,.8fr); gap: 15px; }
+    .task-list { padding: 0 18px; }
+    .task { display: grid; grid-template-columns: 20px minmax(0,1fr) auto; gap: 11px; padding: 14px 0; border-bottom: 1px solid #27303b; align-items: start; }
+    .task:last-child { border-bottom: 0; }
+    .task input[type=checkbox] { width: 15px; height: 15px; margin: 2px 0 0; accent-color: var(--accent); }
+    .task strong { display: block; color: #dce4ee; font-size: 10px; }
+    .task small { display: block; color: #8290a3; font-size: 9px; line-height: 1.6; margin-top: 4px; }
+    .task.done strong { color: #8f9c8a; text-decoration: line-through; }
+    .priority { display: inline-flex; padding: 3px 6px; font-size: 8px; border-radius: 5px; color: #a4b1c4; background: #202732; border: 1px solid #313c4c; white-space: nowrap; }
+    .priority.p0 { color: #ffd48a; background: #322819; border-color: #574427; }
+    .priority.p1 { color: #9ed0ff; background: #172836; border-color: #2c485d; }
+    .build-summary { padding: 18px; }
+    .progress-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+    .progress-row strong { font-size: 23px; letter-spacing: -.05em; }
+    .progress-row span { color: #8491a4; font-size: 10px; }
+    .progress-track { height: 6px; margin: 12px 0 19px; border-radius: 10px; overflow: hidden; background: #252d37; }
+    .progress-fill { height: 100%; background: var(--accent); border-radius: inherit; transition: width .2s ease; }
+    .milestone { display: flex; gap: 10px; padding: 10px 0; border-top: 1px solid #28313c; }
+    .milestone > span:first-child { display: grid; place-items: center; flex: 0 0 24px; height: 24px; background: #202832; border-radius: 7px; color: #a6b4c6; font-size: 10px; }
+    .milestone strong { display: block; font-size: 10px; color: #d7e0eb; }
+    .milestone p { margin: 3px 0 0; font-size: 9px; color: #8592a5; line-height: 1.6; }
+    .integration-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 13px; }
+    .integration-card { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); display: flex; flex-direction: column; min-width: 0; }
+    .integration-top { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
+    .integration-icon { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #1c2718; border: 1px solid #34472b; color: var(--accent); font-size: 15px; }
+    .integration-card h3 { margin: 15px 0 4px; font-size: 13px; }
+    .integration-role { font-size: 10px; color: #9ca9ba; }
+    .integration-card p { flex: 1; min-height: 54px; font-size: 10px; line-height: 1.7; color: #8491a4; margin: 13px 0 17px; }
+    .integration-bottom { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 11px; border-top: 1px solid #29313c; }
+    .integration-bottom a { font-size: 10px; color: #c2f39b; text-decoration: none; }
+    .integration-bottom a:hover { text-decoration: underline; }
+    .tiny-label { color: #78869b; font-size: 9px; }
+    .registry-stats { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); border: 1px solid var(--line); border-radius: 11px; background: #131922; margin: 22px 0 15px; }
+    .registry-stats > div { padding: 14px 17px; border-right: 1px solid #29313c; }
+    .registry-stats > div:last-child { border-right: 0; }
+    .registry-stats span { display: block; color: #8290a3; font-size: 9px; }
+    .registry-stats strong { display: block; margin-top: 8px; font-size: 20px; letter-spacing: -.04em; }
+    .evidence-state { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 6px; border: 1px solid #574826; color: #e7c575; background: #302718; font-size: 9px; }
+    .activity-list { padding: 4px 18px; }
+    .activity-item { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid #28313c; }
+    .activity-item:last-child { border-bottom: 0; }
+    .activity-icon { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%; background: #20291a; border: 1px solid #35472b; color: var(--accent); font-size: 12px; }
+    .activity-body { min-width: 0; flex: 1; }
+    .activity-top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+    .activity-top strong { font-size: 10px; text-transform: capitalize; }
+    .activity-top time { color: #738196; font-size: 9px; white-space: nowrap; }
+    .activity-body p { color: #8b98aa; font-size: 10px; margin: 5px 0 0; line-height: 1.7; }
+    .empty { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 37px 20px; color: #8a98ab; }
+    .empty .big { display: grid; place-items: center; width: 46px; height: 46px; border: 1px solid #34472a; color: var(--accent); background: #1b2717; border-radius: 13px; font-size: 20px; }
+    .empty h3 { font-size: 13px; color: #dce4ee; margin: 13px 0 6px; }
+    .empty p { max-width: 390px; font-size: 10px; line-height: 1.7; margin: 0 0 16px; }
+    .footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; padding: 15px 32px; border-top: 1px solid #222b36; color: #748196; font: 9px ui-monospace,monospace; }
+    .footer a { color: #b8c5d5; text-decoration: none; }
+    .footer a:hover { color: var(--accent); }
+    .local-tag { display: inline-flex; align-items: center; gap: 5px; color: #e5c67d; border: 1px solid #4d4027; background: #292419; border-radius: 30px; padding: 4px 7px; font-size: 9px; }
+    .modal-backdrop { position: fixed; z-index: 60; inset: 0; display: flex; align-items: center; justify-content: center; padding: 18px; background: #030509c9; backdrop-filter: blur(7px); overflow-y: auto; }
+    .modal { width: min(640px,100%); max-height: calc(100vh - 36px); overflow-y: auto; border: 1px solid #3a4656; border-radius: 15px; background: #121720; box-shadow: var(--shadow); }
+    .modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding: 19px 20px 16px; border-bottom: 1px solid #2a3340; }
+    .modal-head h2 { margin: 9px 0 5px; font-size: 18px; letter-spacing: -.04em; }
+    .modal-head p { margin: 0; color: #8e9bad; font-size: 10px; line-height: 1.7; }
+    .modal-form { display: grid; gap: 14px; padding: 18px 20px 20px; }
+    .field { display: flex; flex-direction: column; gap: 6px; font-size: 10px; color: #c4cddb; font-weight: 650; }
+    .field input, .field textarea, .field select { display: block; width: 100%; min-width: 0; border: 1px solid #343f4e; border-radius: 8px; background: #0c1118; color: #e6ecf5; padding: 10px 11px; font-size: 11px; outline: none; font-weight: 400; }
+    .field textarea { min-height: 74px; resize: vertical; line-height: 1.6; }
+    .field input::placeholder, .field textarea::placeholder { color: #657389; }
+    .field-hint { color: #758399; font-size: 9px; line-height: 1.6; font-weight: 400; }
+    .form-row { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+    .form-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 13px; border-top: 1px solid #2b3440; }
+    .form-message { display: none; color: #ffb1b8; background: #301c21; border: 1px solid #60333c; border-radius: 8px; padding: 9px 11px; font-size: 10px; }
+    .form-message.show { display: block; }
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid #303a48; border-radius: 9px; padding: 12px; background: #171d26; }
+    .toggle-row strong { display: block; color: #dce4ee; font-size: 10px; }
+    .toggle-row small { display: block; color: #8794a7; margin-top: 4px; font-size: 9px; line-height: 1.6; }
+    .toggle-row input { width: 16px; height: 16px; accent-color: var(--accent); }
+    .toast { position: fixed; z-index: 80; bottom: 18px; right: 18px; max-width: min(440px,calc(100% - 36px)); border: 1px solid #3b542d; background: #1b2817; color: #d4f2c2; padding: 12px 14px; border-radius: 10px; font-size: 11px; box-shadow: var(--shadow); }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    @media (max-width: 1190px) { .grid-2, .build-layout { grid-template-columns: 1fr; } .integration-grid { grid-template-columns: repeat(2,minmax(0,1fr)); } .stats { gap: 9px; } .stat { padding: 13px; } }
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-105%); transition: transform .2s ease; box-shadow: none; }
+      .sidebar.open { transform: translateX(0); box-shadow: 24px 0 75px #0009; }
+      .main { margin-left: 0; }
+      .menu-btn { display: inline-grid; }
+      .scrim { display: block; position: fixed; z-index: 15; inset: 0; border: 0; background: #0009; }
+      .page { padding: 26px 22px 38px; }
+      .topbar { padding: 0 22px; }
+    }
+    @media (max-width: 650px) {
+      .topbar { height: 57px; flex-basis: 57px; padding: 0 13px; }
+      .top-actions { gap: 6px; }
+      .crumb { gap: 6px; font-size: 10px; }
+      .global-pill { padding: 6px 8px; }
+      .page { padding: 23px 13px 32px; }
+      .page-head { align-items: flex-start; flex-direction: column; gap: 14px; }
+      .page-head h1 { font-size: 32px; }
+      .stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .stat-value { font-size: 25px; }
+      .grid-2 { grid-template-columns: minmax(0,1fr); }
+      .venture-grid, .integration-grid { grid-template-columns: minmax(0,1fr); }
+      .registry-stats { grid-template-columns: repeat(2,minmax(0,1fr)); }
+      .registry-stats > div:nth-child(2) { border-right: 0; }
+      .registry-stats > div:nth-child(1), .registry-stats > div:nth-child(2) { border-bottom: 1px solid #29313c; }
+      .registry-stats > div:nth-child(3) { border-bottom: 0; }
+      .form-row { grid-template-columns: minmax(0,1fr); }
+      .footer { padding: 13px; }
+      .footer span:last-child { display: none; }
+      .modal-backdrop { align-items: flex-end; padding: 9px; }
+      .modal { max-height: calc(100vh - 18px); border-radius: 15px 15px 8px 8px; }
+      .modal-head, .modal-form { padding-left: 15px; padding-right: 15px; }
+      .table-wrap th:nth-child(3), .table-wrap td:nth-child(3) { display: none; }
+      .task { grid-template-columns: 20px minmax(0,1fr); }
+      .task .priority { grid-column: 2; justify-self: start; }
+      .activity-top { align-items: flex-start; flex-direction: column; gap: 4px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app" class="app">
+    <aside id="sidebar" class="sidebar" aria-label="Primary navigation">
+      <div class="brand"><div class="brand-icon">A</div><div><strong>AI Business Portfolio</strong><span>BUILD CONSOLE / 0.1</span></div></div>
+      <div class="workspace-chip"><div class="workspace-letter">P</div><div><strong>Portfolio workspace</strong><small>Global operations</small></div><span aria-hidden="true">⌄</span></div>
+      <div class="side-label">PORTFOLIO</div>
+      <nav id="nav" class="nav">
+        <button class="active" data-view="overview"><span class="nav-icon">⌂</span><span class="nav-label">Overview</span></button>
+        <button data-view="ventures"><span class="nav-icon">◈</span><span class="nav-label">Businesses & products</span></button>
+        <button data-view="build"><span class="nav-icon">▦</span><span class="nav-label">Build board</span></button>
+        <button data-view="integrations"><span class="nav-icon">⛓</span><span class="nav-label">Integrations</span><span class="nav-count" id="integration-nav-count">0</span></button>
+        <button data-view="capabilities"><span class="nav-icon">✧</span><span class="nav-label">Shared capabilities</span></button>
+        <button data-view="activity"><span class="nav-icon">◷</span><span class="nav-label">Evidence & activity</span></button>
+      </nav>
+      <div class="side-divider"></div>
+      <div class="side-label">SYSTEM STATE</div>
+      <div class="side-health">
+        <div class="health-row"><span class="dot green"></span><span>Portfolio interface</span><b>Available locally</b></div>
+        <div class="health-row"><span class="dot amber"></span><span>Persistent shared database</span><b>Not configured</b></div>
+        <div class="health-row"><span class="dot amber"></span><span>Provider connections</span><b>Not verified</b></div>
+      </div>
+      <div class="side-spacer"></div>
+      <div class="safety-note"><strong>Evidence before status</strong><p>A plan is not a deployment. A provider listing is not a connection. This browser prototype labels these boundaries explicitly.</p></div>
+      <div class="side-footer"><span class="dot green"></span><span>LOCAL PROTOTYPE</span><span style="margin-left:auto">v0.1.0</span></div>
+    </aside>
+    <button class="scrim" id="scrim" hidden aria-label="Close navigation"></button>
+    <div class="main">
+      <header class="topbar">
+        <div style="display:flex;align-items:center;gap:9px"><button id="menu-btn" class="icon-btn menu-btn" aria-label="Open navigation">☰</button><div class="crumb"><span>Portfolio</span><span>›</span><b id="breadcrumb">Overview</b></div></div>
+        <div class="top-actions"><span class="global-pill"><span class="dot green"></span> Global scope</span><span class="top-sep"></span><button id="export-btn" class="icon-btn" title="Export portfolio JSON" aria-label="Export portfolio JSON">⇩</button><button id="refresh-btn" class="icon-btn" title="Refresh view" aria-label="Refresh view">↻</button></div>
+      </header>
+      <main id="page" class="page" tabindex="-1"></main>
+      <footer class="footer"><span>AI BUSINESS PORTFOLIO <span style="color:#adb9c9">/ INITIAL BUILD</span></span><span>Portable records · Explicit evidence · Global by default</span><span><a href="https://github.com/Loofy147/AI-Business-Portfolio" target="_blank" rel="noreferrer">Source repository ↗</a></span></footer>
+    </div>
+  </div>
+  <div id="modal-root"></div>
+  <div id="toast-root" aria-live="polite"></div>
+
+  <script>
+    'use strict';
+
+    const STORAGE_KEY = 'ai-business-portfolio.v0.1';
+    const statusLabels = { planned: 'Planned', building: 'Building', validating: 'Validating', launched: 'Launched', paused: 'Paused', blocked: 'Blocked' };
+    const viewLabels = { overview: 'Overview', ventures: 'Businesses & products', build: 'Build board', integrations: 'Integrations', capabilities: 'Shared capabilities', activity: 'Evidence & activity' };
+    const seed = {
+      ventures: [
+        { id: 'abp-core', name: 'AI Business Portfolio', kind: 'Portfolio platform', outcome: 'Build the reusable operating system for developing and managing multiple AI-enabled businesses.', status: 'building', owner: 'Portfolio team', regions: 'Global', next: 'Complete portfolio records and establish server-backed persistence.', repo: 'https://github.com/Loofy147/AI-Business-Portfolio', deployment: '', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'Repository created; initial implementation being established.' },
+        { id: 'flowfoundry', name: 'FlowFoundry AI', kind: 'AI operations studio', outcome: 'Design and deliver reusable automation and customer-operations workflows with approval gates and execution evidence.', status: 'building', owner: 'Portfolio team', regions: 'Global', next: 'Bind repository source, validate authenticated workflows, and connect the first tested execution adapter.', repo: '', deployment: 'https://flowfoundry-ai-fu5ut1.v2.appdeploy.ai/', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'AppDeploy reports ready; read-only TinyFish smoke test observed the sign-in screen. Authenticated workflow tests remain open.' },
+        { id: 'business-automation', name: 'AI Workflow Automation Services', kind: 'Productized service', outcome: 'Deliver controlled business-process automation with repeatable onboarding, deployment, monitoring, and maintenance.', status: 'planned', owner: 'Portfolio team', regions: 'Global; configure per deployment', next: 'Define first reusable service package and its execution adapter contract.', repo: '', deployment: '', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'Planned service line; implementation not yet started.' },
+        { id: 'commerce-ops', name: 'Commerce Operations Toolkit', kind: 'Product / reusable module', outcome: 'Automate catalog, customer communication, order handoffs, and operational reporting for connected commerce systems.', status: 'planned', owner: 'Portfolio team', regions: 'Global; provider availability varies', next: 'Build a sandbox connector with restricted scopes and fixture-based tests.', repo: '', deployment: '', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'Planned capability; external provider is not connected.' },
+        { id: 'content-ops', name: 'Content Operations Studio', kind: 'Productized service', outcome: 'Coordinate content drafting, localization, review, publishing, and measurable delivery outcomes.', status: 'planned', owner: 'Portfolio team', regions: 'Global', next: 'Design the approval and publishing state model.', repo: '', deployment: '', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'Planned service line; no customer work is represented.' },
+        { id: 'customer-ops', name: 'AI Customer Operations', kind: 'Product / managed service', outcome: 'Deliver knowledge-grounded support and routing with explicit escalation and human decision boundaries.', status: 'planned', owner: 'Portfolio team', regions: 'Global; language and data controls per deployment', next: 'Create a synthetic support dataset and define answer-quality and escalation tests.', repo: '', deployment: '', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'Planned service line; no live customer data or channels connected.' },
+        { id: 'data-systems', name: 'Business Intelligence Systems', kind: 'Productized service', outcome: 'Build observable dashboards and traceable reporting from authorized business data sources.', status: 'planned', owner: 'Portfolio team', regions: 'Global; data residency needs per customer', next: 'Define standard event and KPI schemas with data-quality checks.', repo: '', deployment: '', updatedAt: '2026-10-27T10:00:00.000Z', evidence: 'Planned service line; data sources not connected.' }
+      ],
+      tasks: [
+        { id: 'task-repo-spec', title: 'Establish product specification and evidence policy', details: 'Define repository source of truth, lifecycle states, and the boundary between planned, implemented, tested, and deployed.', ventureId: 'abp-core', status: 'done', priority: 'P0', owner: 'Portfolio team', acceptance: 'Specification and evidence lifecycle are documented in the repository.' },
+        { id: 'task-build-ui', title: 'Build interactive portfolio console', details: 'Create and edit ventures, filter records, update task status, maintain integration notes, and export portable JSON.', ventureId: 'abp-core', status: 'building', priority: 'P0', owner: 'Portfolio team', acceptance: 'Core flows work in-browser; input validation and local persistence are explicit.' },
+        { id: 'task-ci', title: 'Add repeatable repository validation', details: 'Validate required files, HTML structure invariants, and the JSON parsing and test metadata policy in CI.', ventureId: 'abp-core', status: 'planned', priority: 'P0', owner: 'Portfolio team', acceptance: 'The validation command passes locally and in GitHub Actions.' },
+        { id: 'task-storage', title: 'Replace browser-only data with durable account-scoped storage', details: 'Choose the shared server/database boundary, identity model, authorization rules, migration strategy, and backup/restore checks.', ventureId: 'abp-core', status: 'planned', priority: 'P0', owner: 'Portfolio team', acceptance: 'Two test identities cannot read or modify each other’s records; data survives a new browser/session.' },
+        { id: 'task-execution', title: 'Implement safe workflow execution contract', details: 'Define job lifecycle, stable request IDs, idempotency receipts, bounded retries, cancellation, checkpoints, and failure recovery.', ventureId: 'flowfoundry', status: 'planned', priority: 'P0', owner: 'Portfolio team', acceptance: 'Duplicate requests do not duplicate effects; unknown outcomes are reconciled from receipts.' },
+        { id: 'task-adapter', title: 'Build and test the first n8n adapter', details: 'Use a controlled test workflow, scoped credentials, webhook authentication, validated payloads, and sanitized run output.', ventureId: 'flowfoundry', status: 'planned', priority: 'P0', owner: 'Portfolio team', acceptance: 'An authorized test run succeeds; unauthorized, malformed, duplicate, and failed runs are safely handled.' },
+        { id: 'task-costs', title: 'Instrument usage, latency, and costs', details: 'Track each workflow, provider/model usage, successful task cost, retries, escalations, and budget thresholds.', ventureId: 'flowfoundry', status: 'planned', priority: 'P1', owner: 'Portfolio team', acceptance: 'Metrics reconcile against provider usage records for a controlled test window.' },
+        { id: 'task-release', title: 'Create release and rollback procedure', details: 'Document staging-to-production promotion, versioned configuration, migration safety, health checks, and rollback validation.', ventureId: 'abp-core', status: 'planned', priority: 'P1', owner: 'Portfolio team', acceptance: 'A rehearsal restores the previous release and passes smoke tests.' }
+      ],
+      integrations: [
+        { id: 'n8n', name: 'n8n', role: 'Workflow orchestration', category: 'Automation', url: 'https://n8n.io/integrations/', status: 'candidate', evidence: 'Official integration directory located. No workflow connection or execution test has been performed.', region: 'Check hosting and data processing per deployment.' },
+        { id: 'openai', name: 'OpenAI API', role: 'Model and AI capabilities', category: 'AI', url: 'https://platform.openai.com/docs', status: 'candidate', evidence: 'Official developer documentation link. API credentials, chosen model, data configuration, limits, and tests are not set here.', region: 'Availability and data terms vary by product and use.' },
+        { id: 'base44', name: 'Base44', role: 'AI application prototyping', category: 'App building', url: 'https://base44.com/developers', status: 'candidate', evidence: 'Official developer page. Portability, authorization, and integration constraints require per-product review.', region: 'Confirm current service availability and terms.' },
+        { id: 'supabase', name: 'Supabase', role: 'Database and application services', category: 'Data', url: 'https://supabase.com/docs', status: 'candidate', evidence: 'Official documentation link only. No project or database is connected to this browser prototype.', region: 'Choose a supported region that fits the service and customer requirements.' },
+        { id: 'shopify', name: 'Shopify', role: 'Commerce API', category: 'Commerce', url: 'https://shopify.dev/docs/api', status: 'candidate', evidence: 'Official API documentation link only. No shop or app permission is configured.', region: 'Store availability and payment services vary by country.' },
+        { id: 'resend', name: 'Resend', role: 'Transactional email', category: 'Communication', url: 'https://resend.com/docs', status: 'candidate', evidence: 'Official documentation link only. No domain, credential, delivery test, or webhook is configured.', region: 'Deliverability and applicable messaging requirements depend on sender and recipients.' },
+        { id: 'google-workspace', name: 'Google Workspace APIs', role: 'Email, files, and calendars', category: 'Productivity', url: 'https://developers.google.com/workspace', status: 'candidate', evidence: 'Official developer docs only. No OAuth consent, scopes, app credentials, or API test is configured.', region: 'Verify consent, data access, and service availability for each deployment.' },
+        { id: 'github-actions', name: 'GitHub Actions', role: 'Continuous integration', category: 'Engineering', url: 'https://docs.github.com/en/actions', status: 'candidate', evidence: 'Official documentation link. Repository workflow will be added and results recorded separately.', region: 'Repository and runner controls must be reviewed.' }
+      ],
+      capabilities: [
+        { id: 'cap-identity', name: 'Identity and authorization', purpose: 'Account/tenant boundaries, roles, operator permissions, credential scopes.', state: 'specification', reuse: 'All products and integrations', priority: 'P0' },
+        { id: 'cap-workflow', name: 'Workflow runtime', purpose: 'Jobs, state transitions, stable request IDs, idempotency, retries, cancellation, recovery.', state: 'specification', reuse: 'Automation and every provider adapter', priority: 'P0' },
+        { id: 'cap-connectors', name: 'Connector and plugin adapters', purpose: 'Typed inputs/outputs, credential scopes, rate limits, retries, redaction, health checks.', state: 'registry started', reuse: 'All business service lines', priority: 'P0' },
+        { id: 'cap-telemetry', name: 'Observability and cost ledger', purpose: 'Correlated events, task success, latency, token/API usage, provider costs, alerts.', state: 'planned', reuse: 'All products', priority: 'P0' },
+        { id: 'cap-approvals', name: 'Human approvals and policy gates', purpose: 'Review before consequential actions, authorization decisions, approvals with traces.', state: 'prototype concepts', reuse: 'Customer messaging, writes, commerce, releases', priority: 'P0' },
+        { id: 'cap-data', name: 'Shared data and audit', purpose: 'Versioned schemas, scoped persistence, tamper-aware audit, retention and export.', state: 'planned', reuse: 'All products', priority: 'P0' },
+        { id: 'cap-release', name: 'Deployment and recovery', purpose: 'Staging, checks, release promotion, rollback, backup/restore, incident runbooks.', state: 'planned', reuse: 'All products', priority: 'P1' },
+        { id: 'cap-eval', name: 'Quality evaluation', purpose: 'Golden test cases, regression checks, human review, outcome and cost thresholds.', state: 'planned', reuse: 'AI tasks, workflow runs, customer-facing outputs', priority: 'P1' }
+      ],
+      activity: [
+        { id: 'evt-init', action: 'repository initialized', details: 'The AI Business Portfolio repository is the source of truth. Initial product workspace and evidence policy are being established.', time: '2026-10-27T10:00:00.000Z', state: 'FACT' },
+        { id: 'evt-flowfoundry', action: 'related deployment recorded', details: 'FlowFoundry AppDeploy URL recorded as a reference; current deployment and authenticated workflow behavior must be rechecked independently.', time: '2026-10-27T10:00:00.000Z', state: 'USER_REPORTED' }
+      ]
+    };
+
+    let state = loadState();
+    let currentView = 'overview';
+    let currentSearch = '';
+    let currentStatusFilter = 'all';
+    let currentModal = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return structuredClone(seed);
+        const saved = JSON.parse(raw);
+        return {
+          ventures: Array.isArray(saved.ventures) ? saved.ventures : structuredClone(seed.ventures),
+          tasks: Array.isArray(saved.tasks) ? saved.tasks : structuredClone(seed.tasks),
+          integrations: Array.isArray(saved.integrations) ? saved.integrations : structuredClone(seed.integrations),
+          capabilities: Array.isArray(saved.capabilities) ? saved.capabilities : structuredClone(seed.capabilities),
+          activity: Array.isArray(saved.activity) ? saved.activity : structuredClone(seed.activity)
+        };
+      } catch (e) {
+        return structuredClone(seed);
+      }
+    }
+
+    function persist() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+        return true;
+      } catch (e) {
+        toast('Browser storage is unavailable or full. Export the portfolio JSON before closing this tab.');
+        return false;
+      }
+    }
+
+    function esc(value) {
+      return String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+    }
+
+    function id(prefix) {
+      return prefix + '-' + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36));
+    }
+
+    function fmtDate(value) {
+      if (!value || Number.isNaN(new Date(value).getTime())) return 'Unknown';
+      return new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(value));
+    }
+
+    function statusBadge(status) {
+      const key = statusLabels[status] ? status : 'planned';
+      return '<span class="badge status-' + key + '"><span class="dot"></span>' + esc(statusLabels[key]) + '</span>';
+    }
+
+    function ventureName(ventureId) {
+      const item = state.ventures.find(x => x.id === ventureId);
+      return item ? item.name : 'Portfolio-wide';
+    }
+
+    function addActivity(action, details, evidenceState = 'USER_REPORTED') {
+      state.activity.unshift({ id: id('evt'), action, details, time: new Date().toISOString(), state: evidenceState });
+      state.activity = state.activity.slice(0, 250);
+      persist();
+    }
+
+    function toast(message) {
+      const root = document.getElementById('toast-root');
+      root.innerHTML = '<div class="toast" role="status">' + esc(message) + '</div>';
+      clearTimeout(toast.timer);
+      toast.timer = setTimeout(() => { root.innerHTML = ''; }, 3600);
+    }
+
+    function changeView(view) {
+      if (!viewLabels[view]) return;
+      currentView = view;
+      currentSearch = '';
+      document.querySelectorAll('#nav button').forEach(button => {
+        button.classList.toggle('active', button.dataset.view === view);
+        button.setAttribute('aria-current', button.dataset.view === view ? 'page' : 'false');
+      });
+      document.getElementById('breadcrumb').textContent = viewLabels[view];
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('scrim').hidden = true;
+      render();
+      document.getElementById('page').focus({ preventScroll: true });
+    }
+
+    function render() {
+      const page = document.getElementById('page');
+      if (currentView === 'overview') page.innerHTML = renderOverview();
+      if (currentView === 'ventures') page.innerHTML = renderVentures();
+      if (currentView === 'build') page.innerHTML = renderBuild();
+      if (currentView === 'integrations') page.innerHTML = renderIntegrations();
+      if (currentView === 'capabilities') page.innerHTML = renderCapabilities();
+      if (currentView === 'activity') page.innerHTML = renderActivity();
+      document.getElementById('integration-nav-count').textContent = state.integrations.filter(x => x.status !== 'verified').length;
+      bindViewEvents();
+    }
+
+    function pageHeader(eyebrow, title, subtitle, action = '') {
+      return '<div class="page-head"><div><div class="eyebrow"><span class="dot green"></span>' + esc(eyebrow) + '</div><h1>' + title + '</h1><p>' + esc(subtitle) + '</p></div>' + action + '</div>';
+    }
+
+    function renderOverview() {
+      const building = state.ventures.filter(x => x.status === 'building').length;
+      const validating = state.ventures.filter(x => x.status === 'validating').length;
+      const launched = state.ventures.filter(x => x.status === 'launched').length;
+      const openTasks = state.tasks.filter(x => x.status !== 'done').length;
+      const verified = state.integrations.filter(x => x.status === 'verified').length;
+      const activeVentures = state.ventures.filter(x => x.status !== 'paused');
+      const recent = [...state.ventures].sort((a,b) => new Date(b.updatedAt) - new Date(a.updatedAt)).slice(0,5);
+      return pageHeader('Portfolio command', 'Build more. <span>Reuse what works.</span>', 'One operating workspace for building multiple businesses, products, and reusable systems across regions.', '<button class="btn btn-primary" data-action="new-venture">＋ New business / product</button>') +
+        '<section class="stats" aria-label="Portfolio summary">' +
+          stat('Businesses & products', state.ventures.length, 'registered records', '◈', 'Portfolio records are not revenue claims.') +
+          stat('In build', building, validating + ' validating', '▦', 'Lifecycle state recorded per product.') +
+          stat('Open build tasks', openTasks, state.tasks.filter(x=>x.status==='done').length + ' marked done', '◷', 'Task state is local to this browser.') +
+          stat('Verified integrations', verified, state.integrations.length + ' candidates tracked', '⛓', 'No connector is verified by this prototype.') +
+        '</section>' +
+        '<div class="grid-2"><section class="panel"><div class="panel-head"><div><h2>Portfolio activity</h2><p>Actual implementation status, not opportunity scoring</p></div><button class="text-btn" data-view="ventures">All records →</button></div>' +
+          (recent.length ? '<div class="table-wrap"><table><thead><tr><th>Business / product</th><th>State</th><th>Updated</th></tr></thead><tbody>' + recent.map(x=>'<tr><td><div class="venture-cell"><div class="venture-icon">' + esc(x.name.slice(0,1).toUpperCase()) + '</div><div><strong>' + esc(x.name) + '</strong><small>' + esc(x.kind) + '</small></div></div></td><td>' + statusBadge(x.status) + '</td><td class="quiet">' + fmtDate(x.updatedAt) + '</td></tr>').join('') + '</tbody></table></div>' : emptyBlock('No records yet','Add a business or product to start the portfolio.','new-venture')) +
+        '</section><div class="side-stack"><section class="panel"><div class="panel-head"><div><h2>Build integrity</h2><p>Current system boundaries</p></div><span style="color:var(--accent)">◇</span></div><div class="control-list">' +
+          controlRow('Portfolio records','Editable in this browser; shared storage not configured.','◈','pending') +
+          controlRow('Source of truth','GitHub repository is intended as the versioned specification and code record.','⌘','ok') +
+          controlRow('External execution','No provider is called by this prototype.','⛓','pending') +
+          controlRow('Authorization','Client-side status is not a server permission boundary.','▣','pending') +
+        '</div></section><section class="panel"><div class="panel-head"><div><h2>Next engineering steps</h2><p>Highest-priority unfinished work</p></div><button class="text-btn" data-view="build">Open board →</button></div><div class="control-list">' +
+          state.tasks.filter(x=>x.status!=='done').slice(0,3).map(t=>'<div class="control"><span class="control-icon">▦</span><div><strong>' + esc(t.title) + '</strong><p>' + esc(t.details) + '</p></div><span class="pending">' + esc(t.priority) + '</span></div>').join('') +
+        '</div></section></div></div>' +
+        '<div class="callout"><div class="callout-icon">✧</div><div class="callout-content"><strong>Build the shared layer once; keep each business independently operable.</strong><p>Identity, workflows, connectors, approvals, telemetry, testing, and releases should become reusable capabilities—not one-off glue code.</p></div><button class="btn btn-secondary" data-view="capabilities">Shared capabilities →</button></div>' +
+        '<div class="banner"><span>ⓘ</span><div><strong>Prototype boundary</strong><p>This version stores records in browser localStorage. Use it to operate the UI and shape the data model, not as multi-device persistence or a production system of record. Export your data regularly while working locally.</p></div></div>';
+    }
+
+    function stat(title, value, sub, icon, foot) {
+      return '<div class="stat"><div class="stat-head"><span>' + esc(title) + '</span><span class="stat-icon">' + esc(icon) + '</span></div><div class="stat-value">' + esc(value) + '<small>' + esc(sub) + '</small></div><div class="stat-foot">' + esc(foot) + '</div></div>';
+    }
+
+    function controlRow(title, text, icon, stateClass) {
+      return '<div class="control"><span class="control-icon">' + esc(icon) + '</span><div><strong>' + esc(title) + '</strong><p>' + esc(text) + '</p></div><span class="' + (stateClass === 'ok' ? 'ok' : 'pending') + '">' + (stateClass === 'ok' ? '✓' : '•') + '</span></div>';
+    }
+
+    function renderVentures() {
+      const list = filterVentures();
+      return pageHeader('Business register','Businesses & <span>products.</span>','Treat each business as an independently deployable unit with explicit status, deliverable, next step, and implementation evidence.','<button class="btn btn-primary" data-action="new-venture">＋ New business / product</button>') +
+        '<div class="toolbar"><label class="search"><span>⌕</span><input id="venture-search" type="search" value="' + esc(currentSearch) + '" placeholder="Search names, outcomes, regions…" aria-label="Search businesses and products"></label><select id="venture-status-filter" class="select" aria-label="Filter by lifecycle state"><option value="all">All states</option>' + Object.keys(statusLabels).map(x=>'<option value="'+x+'" '+(currentStatusFilter===x?'selected':'')+'>'+statusLabels[x]+'</option>').join('') + '</select><span class="result-count">' + list.length + ' of ' + state.ventures.length + ' records</span></div>' +
+        (list.length ? '<div class="venture-grid">' + list.map(ventureCard).join('') + '</div>' : emptyBlock('No matching records','Change the filter or add a new business/product.','new-venture'));
+    }
+
+    function filterVentures() {
+      const term = currentSearch.trim().toLowerCase();
+      return state.ventures.filter(x => (currentStatusFilter === 'all' || x.status === currentStatusFilter) && (!term || [x.name,x.kind,x.outcome,x.regions,x.next,x.owner].some(v=>String(v||'').toLowerCase().includes(term))));
+    }
+
+    function ventureCard(x) {
+      const taskCount = state.tasks.filter(t=>t.ventureId===x.id).length;
+      const doneCount = state.tasks.filter(t=>t.ventureId===x.id && t.status==='done').length;
+      const links = (x.repo ? '<a href="'+esc(x.repo)+'" target="_blank" rel="noreferrer" class="btn btn-quiet btn-sm">Source ↗</a>' : '') + (x.deployment ? '<a href="'+esc(x.deployment)+'" target="_blank" rel="noreferrer" class="btn btn-quiet btn-sm">Deployment ↗</a>' : '');
+      return '<article class="venture-card"><div class="venture-card-top"><div class="venture-icon">'+esc(x.name.slice(0,1).toUpperCase())+'</div><div class="venture-title"><h3>'+esc(x.name)+'</h3><small>'+esc(x.kind)+'</small></div>'+statusBadge(x.status)+'</div><p>'+esc(x.outcome)+'</p><div class="venture-meta"><div><span class="meta-label">Regions</span><span class="meta-value">'+esc(x.regions||'Not specified')+'</span></div><div><span class="meta-label">Build tasks</span><span class="meta-value">'+doneCount+' / '+taskCount+' complete</span></div><div><span class="meta-label">Owner</span><span class="meta-value">'+esc(x.owner||'Unassigned')+'</span></div><div><span class="meta-label">Last changed</span><span class="meta-value">'+fmtDate(x.updatedAt)+'</span></div></div><div class="next-step"><strong>NEXT IMPLEMENTATION STEP</strong><span>'+esc(x.next||'Not specified')+'</span></div><div class="card-actions">'+links+'<button class="btn btn-secondary btn-sm" data-action="edit-venture" data-id="'+esc(x.id)+'">Edit record</button><button class="btn btn-secondary btn-sm" data-action="venture-status" data-id="'+esc(x.id)+'">Change state</button></div></article>';
+    }
+
+    function renderBuild() {
+      const open = state.tasks.filter(x=>x.status!=='done').length;
+      const done = state.tasks.filter(x=>x.status==='done').length;
+      const percent = state.tasks.length ? Math.round(done/state.tasks.length*100) : 0;
+      const tasks = state.tasks;
+      return pageHeader('Implementation control','Build board. <span>Ship evidence.</span>','Prioritize implementation, integration testing, reliability controls, and repeatable delivery. Completion is recorded locally and must be confirmed by external evidence.','<button class="btn btn-primary" data-action="new-task">＋ Add build task</button>') +
+        '<div class="build-layout"><section class="panel"><div class="panel-head"><div><h2>Implementation backlog</h2><p>Change a task status as work progresses</p></div><span class="result-count">'+open+' open</span></div><div class="task-list">'+(tasks.length?tasks.map(taskRow).join(''):emptyBlock('No tasks yet','Add the first implementation task.','new-task'))+'</div></section><div class="side-stack"><section class="panel"><div class="panel-head"><div><h2>Build progress</h2><p>Derived from current local task states</p></div></div><div class="build-summary"><div class="progress-row"><strong>'+percent+'%</strong><span>'+done+' done · '+open+' open</span></div><div class="progress-track"><div class="progress-fill" style="width:'+percent+'%"></div></div>'+[
+          ['1','Make data durable','Move from browser storage to authenticated persistent storage.'],
+          ['2','Implement execution','Build one real adapter with request IDs and recovery.'],
+          ['3','Prove isolation','Test role/tenant boundaries and unauthorized calls.'],
+          ['4','Measure the system','Track success, latency, failures, usage, and per-task cost.'],
+          ['5','Release safely','Run staging checks, backup/restore, and rollback rehearsal.']
+        ].map(m=>'<div class="milestone"><span>'+m[0]+'</span><div><strong>'+m[1]+'</strong><p>'+m[2]+'</p></div></div>').join('')+'</div></section><section class="panel"><div class="panel-head"><div><h2>Readiness gates</h2><p>Do not claim production-ready until met</p></div></div><div class="control-list">'+controlRow('Authorization tests','At least two identities and explicit denied paths.','▣','pending')+controlRow('Failure and recovery','Retry, timeout, duplicate request, and unknown outcome cases.','↻','pending')+controlRow('Cost limits','Per-provider quotas, budgets, and cancellation.','＄','pending')+controlRow('Release evidence','CI result, deployment status, smoke test, rollback path.','✓','pending')+'</div></section></div></div>';
+    }
+
+    function taskRow(t) {
+      const checked = t.status==='done'?'checked':'';
+      const taskStatus = t.status==='done'?'done':t.status==='building'?'building':'planned';
+      return '<div class="task '+(t.status==='done'?'done':'')+'"><input type="checkbox" data-task-toggle="'+esc(t.id)+'" '+checked+' aria-label="Mark '+esc(t.title)+' as done"><div><strong>'+esc(t.title)+'</strong><small>'+esc(t.details)+'<br>Business: '+esc(ventureName(t.ventureId))+' · Owner: '+esc(t.owner||'Unassigned')+'</small><small>Acceptance: '+esc(t.acceptance||'Not defined')+'</small></div><div class="action-row"><span class="priority '+(t.priority==='P0'?'p0':t.priority==='P1'?'p1':'')+'">'+esc(t.priority)+'</span><select class="select" style="min-height:27px;padding:0 5px" data-task-status="'+esc(t.id)+'" aria-label="Task status">'+['planned','building','done'].map(s=>'<option value="'+s+'" '+(t.status===s?'selected':'')+'>'+({planned:'Planned',building:'Building',done:'Done'}[s])+'</option>').join('')+'</select><button class="icon-btn" style="width:27px;height:27px" data-action="edit-task" data-id="'+esc(t.id)+'" title="Edit task" aria-label="Edit task">✎</button></div></div>';
+    }
+
+    function renderIntegrations() {
+      const list = state.integrations.filter(x=>!currentSearch || [x.name,x.role,x.category,x.evidence,x.region].some(v=>String(v||'').toLowerCase().includes(currentSearch.toLowerCase())));
+      const candidates = state.integrations.filter(x=>x.status==='candidate').length;
+      const configured = state.integrations.filter(x=>x.status==='configured').length;
+      const tested = state.integrations.filter(x=>x.status==='tested').length;
+      const verified = state.integrations.filter(x=>x.status==='verified').length;
+      return pageHeader('Provider and connector registry','Integrations. <span>Prove each one.</span>','Track official docs, credentials, supported operations, limitations, and reproducible test evidence. Nothing is marked connected by default.','<button class="btn btn-primary" data-action="new-integration">＋ Add integration</button>')+
+        '<div class="registry-stats"><div><span>Candidate</span><strong>'+candidates+'</strong></div><div><span>Configured (operator-recorded)</span><strong>'+configured+'</strong></div><div><span>Tested (evidence recorded)</span><strong>'+tested+'</strong></div><div><span>Verified (evidence recorded)</span><strong>'+verified+'</strong></div></div>'+
+        '<div class="banner" style="margin-top:0;margin-bottom:15px"><span>ⓘ</span><div><strong>What “verified” means here</strong><p>The UI records your evidence statement; it does not run provider tests or independently authenticate claims. Link a reproducible test result, CI run, or official reference. Never store API keys, tokens, or sensitive customer data in these notes.</p></div></div>'+
+        '<div class="toolbar"><label class="search"><span>⌕</span><input id="integration-search" type="search" value="'+esc(currentSearch)+'" placeholder="Search providers, categories, evidence…" aria-label="Search integrations"></label><span class="result-count">'+list.length+' tracked</span></div>'+
+        (list.length?'<div class="integration-grid">'+list.map(integrationCard).join('')+'</div>':emptyBlock('No matching integrations','Search a different term or add a provider.','new-integration'));
+    }
+
+    function integrationCard(x) {
+      const labels={candidate:'Candidate',configured:'Configured',tested:'Tested',verified:'Verified · evidence'};
+      const classes={candidate:'status-planned',configured:'status-building',tested:'status-validating',verified:'status-launched'};
+      return '<article class="integration-card"><div class="integration-top"><div class="integration-icon">⛓</div><span class="badge '+(classes[x.status]||classes.candidate)+'"><span class="dot"></span>'+esc(labels[x.status]||'Candidate')+'</span></div><h3>'+esc(x.name)+'</h3><span class="integration-role">'+esc(x.role)+' · '+esc(x.category)+'</span><p>'+esc(x.evidence)+'</p><div class="integration-bottom"><span class="tiny-label">'+esc(x.region||'Region not assessed')+'</span><a href="'+esc(x.url)+'" target="_blank" rel="noreferrer">Official link ↗</a></div><div class="card-actions"><button class="btn btn-secondary btn-sm" data-action="edit-integration" data-id="'+esc(x.id)+'">Record evidence</button></div></article>';
+    }
+
+    function renderCapabilities() {
+      return pageHeader('Reusable engineering assets','Shared <span>capabilities.</span>','Each capability should have an owner, a contract, tests, operational telemetry, and a clear consumer list before being reused across businesses.','<button class="btn btn-primary" data-action="new-capability">＋ Add capability</button>')+
+        '<div class="venture-grid">'+state.capabilities.map(c=>'<article class="venture-card"><div class="venture-card-top"><div class="venture-icon">✧</div><div class="venture-title"><h3>'+esc(c.name)+'</h3><small>Priority '+esc(c.priority)+'</small></div><span class="badge status-planned"><span class="dot"></span>'+esc(c.state)+'</span></div><p>'+esc(c.purpose)+'</p><div class="venture-meta"><div><span class="meta-label">Reuse across</span><span class="meta-value">'+esc(c.reuse)+'</span></div><div><span class="meta-label">Maturity</span><span class="meta-value">Not production-validated</span></div></div><div class="card-actions"><button class="btn btn-secondary btn-sm" data-action="edit-capability" data-id="'+esc(c.id)+'">Edit capability</button></div></article>').join('')+'</div>'+
+        '<div class="banner"><span>ⓘ</span><div><strong>Reusable does not mean universally suitable</strong><p>Each consumer must inherit security boundaries, but choose its own configuration, provider permissions, data retention, regional settings, and acceptance criteria.</p></div></div>';
+    }
+
+    function renderActivity() {
+      return pageHeader('Change history and evidence','Evidence & <span>activity.</span>','This is a local, operator-editable record of notable changes—not a tamper-proof security audit log. Production audit events must be written server-side.','<button class="btn btn-secondary" data-action="export">⇩ Export records</button>')+
+        '<div class="panel"><div class="panel-head"><div><h2>Recent events</h2><p>Newest first · locally stored in this browser</p></div><span class="evidence-state">LOCAL RECORDS</span></div><div class="activity-list">'+(state.activity.length?state.activity.map(e=>'<div class="activity-item"><div class="activity-icon">◷</div><div class="activity-body"><div class="activity-top"><strong>'+esc(e.action)+'</strong><time>'+fmtDate(e.time)+'</time></div><p>'+esc(e.details)+'</p><span class="tiny-label">Claim state: '+esc(e.state||'USER_REPORTED')+'</span></div></div>').join(''):emptyBlock('No activity','Changes will appear here.',''))+'</div></div>'+
+        '<div class="banner"><span>ⓘ</span><div><strong>Evidence policy</strong><p>Store claims, source, timestamp, scope, and verification method together. Keep credentials and customer secrets out of the record. Do not upgrade the claim status merely because the same statement is repeated.</p></div></div>';
+    }
+
+    function emptyBlock(title, text, action) {
+      return '<div class="empty"><div class="big">＋</div><h3>'+esc(title)+'</h3><p>'+esc(text)+'</p>'+(action?'<button class="btn btn-primary" data-action="'+esc(action)+'">Create record</button>':'')+'</div>';
+    }
+
+    function bindViewEvents() {
+      document.querySelectorAll('[data-view]').forEach(element => {
+        element.onclick = () => changeView(element.dataset.view);
+      });
+      document.querySelectorAll('[data-action]').forEach(element => {
+        element.onclick = () => handleAction(element.dataset.action, element.dataset.id || '');
+      });
+      const search = document.getElementById('venture-search') || document.getElementById('integration-search');
+      if (search) search.oninput = event => {
+        currentSearch = event.target.value;
+        const start = event.target.selectionStart;
+        const end = event.target.selectionEnd;
+        render();
+        const next = document.getElementById('venture-search') || document.getElementById('integration-search');
+        if (next) { next.focus(); next.setSelectionRange(start,end); }
+      };
+      const statusFilter = document.getElementById('venture-status-filter');
+      if (statusFilter) statusFilter.onchange = event => { currentStatusFilter = event.target.value; render(); };
+      document.querySelectorAll('[data-task-toggle]').forEach(input => {
+        input.onchange = () => {
+          const task = state.tasks.find(t=>t.id===input.dataset.taskToggle);
+          if (!task) return;
+          task.status = input.checked ? 'done' : 'planned';
+          addActivity('build task status changed', task.title + ' marked ' + task.status + '. Changes are local and require independent completion evidence.', 'USER_REPORTED');
+          render(); toast('Task status updated locally.');
+        };
+      });
+      document.querySelectorAll('[data-task-status]').forEach(select => {
+        select.onchange = () => {
+          const task = state.tasks.find(t=>t.id===select.dataset.taskStatus);
+          if (!task) return;
+          task.status = select.value;
+          addActivity('build task status changed', task.title + ' marked ' + task.status + '. Changes are local and require independent completion evidence.', 'USER_REPORTED');
+          render();
+        };
+      });
+    }
+
+    function handleAction(action, recordId) {
+      if (action === 'new-venture') return openVentureForm();
+      if (action === 'edit-venture') return openVentureForm(state.ventures.find(x=>x.id===recordId));
+      if (action === 'venture-status') return openStatusForm(state.ventures.find(x=>x.id===recordId));
+      if (action === 'new-task') return openTaskForm();
+      if (action === 'edit-task') return openTaskForm(state.tasks.find(x=>x.id===recordId));
+      if (action === 'new-integration') return openIntegrationForm();
+      if (action === 'edit-integration') return openIntegrationForm(state.integrations.find(x=>x.id===recordId));
+      if (action === 'new-capability') return openCapabilityForm();
+      if (action === 'edit-capability') return openCapabilityForm(state.capabilities.find(x=>x.id===recordId));
+      if (action === 'export') return exportState();
+    }
+
+    function showModal(title, subtitle, fields, submitLabel, onSubmit, warning = '') {
+      const root = document.getElementById('modal-root');
+      root.innerHTML = '<div class="modal-backdrop" id="modal-backdrop"><section class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-head"><div><div class="eyebrow"><span class="dot green"></span>PORTFOLIO RECORD</div><h2 id="modal-title">'+esc(title)+'</h2><p>'+esc(subtitle)+'</p></div><button class="icon-btn" type="button" id="modal-close" aria-label="Close dialog">✕</button></div><form class="modal-form" id="modal-form" novalidate>'+fields+(warning?'<div class="banner" style="margin-top:0"><span>ⓘ</span><div><strong>Evidence boundary</strong><p>'+esc(warning)+'</p></div></div>':'')+'<div class="form-message" id="form-message" role="alert"></div><div class="form-actions"><button type="button" class="btn btn-quiet" id="modal-cancel">Cancel</button><button type="submit" class="btn btn-primary">'+esc(submitLabel)+'</button></div></form></section></div>';
+      root.querySelector('#modal-close').onclick = closeModal;
+      root.querySelector('#modal-cancel').onclick = closeModal;
+      root.querySelector('#modal-backdrop').onclick = event => { if (event.target.id === 'modal-backdrop') closeModal(); };
+      root.querySelector('#modal-form').onsubmit = event => {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const data = Object.fromEntries(new FormData(form).entries());
+        form.querySelectorAll('input[type=checkbox][name]').forEach(c => data[c.name] = c.checked);
+        try {
+          const result = onSubmit(data);
+          if (result === false) return;
+          closeModal();
+          persist();
+          render();
+        } catch (err) {
+          const message = root.querySelector('#form-message');
+          message.textContent = err.message || 'Please review the entered values.';
+          message.classList.add('show');
+        }
+      };
+      currentModal = root.querySelector('#modal-form');
+      const first = root.querySelector('input:not([type=checkbox]),textarea,select');
+      if (first) first.focus();
+      document.onkeydown = event => { if (event.key === 'Escape') closeModal(); };
+    }
+
+    function closeModal() {
+      document.getElementById('modal-root').innerHTML = '';
+      currentModal = null;
+      document.onkeydown = null;
+    }
+
+    function field(label, name, value, type='text', required=false, hint='') {
+      const safeValue = esc(value || '');
+      const req = required ? ' required maxlength="500"' : ' maxlength="1000"';
+      if (type === 'textarea') return '<label class="field">'+esc(label)+(required?' *':'')+'<textarea name="'+esc(name)+'"'+req+' placeholder="Enter '+esc(label.toLowerCase())+'">'+safeValue+'</textarea>'+(hint?'<span class="field-hint">'+esc(hint)+'</span>':'')+'</label>';
+      if (type === 'select') return '<label class="field">'+esc(label)+(required?' *':'')+'<select name="'+esc(name)+'"'+(required?' required':'')+'>'+value.map(option=>'<option value="'+esc(option.value)+'" '+(option.value===option.selected?'selected':'')+'>'+esc(option.label)+'</option>').join('')+'</select></label>';
+      const inputType = type === 'url' ? 'url' : 'text';
+      return '<label class="field">'+esc(label)+(required?' *':'')+'<input type="'+inputType+'" name="'+esc(name)+'" value="'+safeValue+'"'+req+' placeholder="'+esc(hint)+'">'+(type==='url'?'<span class="field-hint">Optional. Do not place access tokens or secrets in URLs.</span>':'')+'</label>';
+    }
+
+    function selectOptions(values, selected) {
+      return values.map(value=>({ value, label: value.charAt(0).toUpperCase()+value.slice(1).replace(/_/g,' '), selected }));
+    }
+
+    function openVentureForm(item) {
+      const v = item || { name:'',kind:'Product / service',outcome:'',status:'planned',owner:'Portfolio team',regions:'Global',next:'',repo:'',deployment:'',evidence:'' };
+      const editing = Boolean(item);
+      const html = field('Business / product name','name',v.name,'text',true,'')+
+        field('Type','kind',v.kind,'text',true,'')+
+        field('Purpose and intended outcome','outcome',v.outcome,'textarea',true,'State the product outcome, not a market thesis.')+
+        '<div class="form-row">'+field('Lifecycle state','status',selectOptions(Object.keys(statusLabels),v.status),'select',true)+field('Owner','owner',v.owner,'text',false,'')+'</div>'+
+        field('Regions served','regions',v.regions,'text',false,'Global or selected regions; configure specifics per service.')+
+        field('Next implementation step','next',v.next,'textarea',false,'What will be built or verified next?')+
+        '<div class="form-row">'+field('Source repository URL','repo',v.repo,'url',false,'https://github.com/owner/repo')+field('Deployment URL','deployment',v.deployment,'url',false,'https://…')+'</div>'+
+        field('Evidence and current limitations','evidence',v.evidence,'textarea',false,'What is confirmed? What remains unknown?');
+      showModal(editing?'Edit business / product':'Add business / product','Each record tracks what is being built, current evidence, and the next concrete implementation step.',html,editing?'Save changes':'Create record',data=>{
+        if (!data.name.trim() || !data.kind.trim() || !data.outcome.trim()) throw new Error('Name, type, and intended outcome are required.');
+        const record = { ...v, name:data.name.trim(), kind:data.kind.trim(), outcome:data.outcome.trim(), status:data.status, owner:data.owner.trim()||'Unassigned', regions:data.regions.trim()||'Global', next:data.next.trim(), repo:validUrl(data.repo), deployment:validUrl(data.deployment), evidence:data.evidence.trim(), updatedAt:new Date().toISOString() };
+        if (editing) Object.assign(item,record); else state.ventures.unshift({id:id('venture'),...record});
+        addActivity(editing?'business / product updated':'business / product created',record.name+' record saved. Status: '+statusLabels[record.status]+'. '+(record.evidence||'No evidence note provided.'),'USER_REPORTED');
+        toast(editing?'Record updated locally.':'Business/product added locally.');
+      },'Lifecycle status reflects recorded state only. Deployment links are references; the UI does not verify that a URL is live.');
+    }
+
+    function openStatusForm(item) {
+      if (!item) return;
+      const html = field('Lifecycle state','status',selectOptions(Object.keys(statusLabels),item.status),'select',true)+field('Evidence for the state change','evidence',item.evidence,'textarea',true,'Describe the observable result, test artifact, commit, or deployment check.');
+      showModal('Record implementation state','A state label is not verification. Explain the evidence and the scope it covers.',html,'Save state',data=>{
+        if (!data.evidence.trim()) throw new Error('Enter the evidence or explicit reason this state remains unverified.');
+        const previous=item.status;
+        item.status=data.status;
+        item.evidence=data.evidence.trim();
+        item.updatedAt=new Date().toISOString();
+        addActivity('business / product state changed',item.name+' changed from '+statusLabels[previous]+' to '+statusLabels[item.status]+'. Evidence note: '+item.evidence,'USER_REPORTED');
+        toast('State change recorded. Independent verification may still be required.');
+      },'This form records an operator statement only. It does not run tests or independently verify a deployment.');
+    }
+
+    function openTaskForm(task) {
+      const t = task || {title:'',details:'',ventureId:state.ventures[0]?.id||'',status:'planned',priority:'P1',owner:'Portfolio team',acceptance:''};
+      const editing = Boolean(task);
+      const ventureOptions = state.ventures.map(v=>({value:v.id,label:v.name,selected:v.id===t.ventureId}));
+      const html = field('Task title','title',t.title,'text',true,'')+
+        field('Implementation details','details',t.details,'textarea',true,'')+
+        field('Business / product','ventureId',[{value:'',label:'Portfolio-wide',selected:!t.ventureId},...ventureOptions],'select',false)+
+        '<div class="form-row">'+field('Priority','priority',selectOptions(['P0','P1','P2'],t.priority),'select',true)+field('Task state','status',selectOptions(['planned','building','done'],t.status),'select',true)+'</div>'+
+        field('Owner','owner',t.owner,'text',false,'')+
+        field('Acceptance criteria','acceptance',t.acceptance,'textarea',true,'Specify observable, repeatable completion criteria.');
+      showModal(editing?'Edit build task':'Add build task','Tasks should have a concrete output and testable acceptance criteria.',html,editing?'Save task':'Add task',data=>{
+        if (!data.title.trim() || !data.details.trim() || !data.acceptance.trim()) throw new Error('Task title, details, and acceptance criteria are required.');
+        const record={...t,title:data.title.trim(),details:data.details.trim(),ventureId:data.ventureId||'',status:data.status,priority:data.priority,owner:data.owner.trim()||'Unassigned',acceptance:data.acceptance.trim()};
+        if (editing) Object.assign(task,record); else state.tasks.push({id:id('task'),...record});
+        addActivity(editing?'build task updated':'build task created',record.title+' saved with state '+record.status+'. Acceptance: '+record.acceptance,'USER_REPORTED');
+        toast('Build task saved locally.');
+      });
+    }
+
+    function openIntegrationForm(item) {
+      const x=item||{name:'',role:'',category:'Automation',url:'',status:'candidate',evidence:'',region:''};
+      const editing=Boolean(item);
+      const html=field('Provider / integration name','name',x.name,'text',true,'')+
+        field('Role in the system','role',x.role,'text',true,'')+
+        '<div class="form-row">'+field('Category','category',x.category,'text',true,'')+field('Official documentation URL','url',x.url,'url',true,'https://…')+'</div>'+
+        field('Evidence state','status',selectOptions(['candidate','configured','tested','verified'],x.status),'select',true)+
+        field('Evidence note / artifact','evidence',x.evidence,'textarea',true,'State what was actually done and link a test result, official contract, or CI run where possible.')+
+        field('Regional / operational constraints','region',x.region,'textarea',false,'Availability, data processing, quotas, language, support, and other relevant constraints.');
+      showModal(editing?'Update integration evidence':'Register integration candidate','Record capabilities and test state without representing untested connections as live.',html,editing?'Save evidence':'Add integration',data=>{
+        if(!data.name.trim()||!data.role.trim()||!data.url.trim()||!data.evidence.trim()) throw new Error('Name, role, documentation URL, and evidence note are required.');
+        const newUrl=validUrl(data.url);
+        if(!newUrl) throw new Error('Enter a valid HTTPS documentation URL.');
+        if(data.status==='verified' && !/(https:\\/\\/|commit|test|ci|run id|sha256|verified by)/i.test(data.evidence)) throw new Error('For Verified, include a test artifact, commit, CI/run reference, hash, or explicit verification record.');
+        const record={...x,name:data.name.trim(),role:data.role.trim(),category:data.category.trim(),url:newUrl,status:data.status,evidence:data.evidence.trim(),region:data.region.trim()};
+        if(editing) Object.assign(item,record); else state.integrations.push({id:id('integration'),...record});
+        addActivity('integration registry updated',record.name+' recorded as '+record.status+'. Evidence: '+record.evidence,'USER_REPORTED');
+        toast('Integration evidence record saved. The provider was not called by this UI.');
+      },'Evidence text is operator-entered. “Verified” is an asserted record until corroborated by the referenced test, CI run, or provider response.');
+    }
+
+    function openCapabilityForm(item) {
+      const c=item||{name:'',purpose:'',state:'specification',reuse:'',priority:'P1'};
+      const editing=Boolean(item);
+      const html=field('Capability name','name',c.name,'text',true,'')+
+        field('Purpose and contract','purpose',c.purpose,'textarea',true,'')+
+        field('Reusable consumers','reuse',c.reuse,'textarea',true,'')+
+        '<div class="form-row">'+field('Maturity state','state',''+c.state,'text',true,'planned, specification, prototype, tested, production')+field('Priority','priority',selectOptions(['P0','P1','P2'],c.priority),'select',true)+'</div>';
+      showModal(editing?'Edit shared capability':'Add shared capability','Define reusable components separately from the businesses that consume them.',html,editing?'Save capability':'Add capability',data=>{
+        if(!data.name.trim()||!data.purpose.trim()||!data.reuse.trim()) throw new Error('Name, purpose, and reusable consumers are required.');
+        const record={...c,name:data.name.trim(),purpose:data.purpose.trim(),state:data.state.trim(),reuse:data.reuse.trim(),priority:data.priority};
+        if(editing) Object.assign(item,record); else state.capabilities.push({id:id('cap'),...record});
+        addActivity(editing?'shared capability updated':'shared capability created',record.name+' capability record updated. Maturity remains an operator record.','USER_REPORTED');
+        toast('Shared capability saved locally.');
+      });
+    }
+
+    function validUrl(value) {
+      const text=String(value||'').trim();
+      if (!text) return '';
+      try {
+        const url=new URL(text);
+        return url.protocol==='https:'?url.href:'';
+      } catch (e) { return ''; }
+    }
+
+    function exportState() {
+      const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),schemaVersion:'0.1.0',scope:'local browser workspace; records are not independently verified',...state},null,2)],{type:'application/json'});
+      const url=URL.createObjectURL(blob);
+      const anchor=document.createElement('a');
+      anchor.href=url; anchor.download='ai-business-portfolio-export.json'; anchor.click();
+      URL.revokeObjectURL(url);
+      toast('Export requested. Store the file securely; it may contain operational notes.');
+      addActivity('portfolio exported','A JSON export was generated from the current browser state.','USER_REPORTED');
+    }
+
+    document.getElementById('nav').addEventListener('click',event=>{
+      const button=event.target.closest('button[data-view]');
+      if(button) changeView(button.dataset.view);
+    });
+    document.getElementById('menu-btn').addEventListener('click',()=>{
+      document.getElementById('sidebar').classList.add('open');
+      document.getElementById('scrim').hidden=false;
+    });
+    document.getElementById('scrim').addEventListener('click',()=>{
+      document.getElementById('sidebar').classList.remove('open');
+      document.getElementById('scrim').hidden=true;
+    });
+    document.getElementById('refresh-btn').addEventListener('click',()=>{
+      state=loadState(); render(); toast('Reloaded the portfolio from this browser’s saved records.');
+    });
+    document.getElementById('export-btn').addEventListener('click',exportState);
+    render();
+  </script>
+</body>
+</html>
