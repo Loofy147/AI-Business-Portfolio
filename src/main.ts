@@ -57,6 +57,7 @@ import { api, auth } from '@appdeploy/client';
     let currentStatusFilter = 'all';
     let currentModal = null;
     let authUser = null;
+    let workspaceVersion = null;
     let authStatus = 'checking';
     let authError = '';
     let syncState = 'idle';
@@ -197,9 +198,10 @@ import { api, auth } from '@appdeploy/client';
       syncInFlight = true;
       syncState = 'syncing';
       updateChrome();
-      const payload = snapshotForServer(structuredClone(state));
+      const payload = { ...snapshotForServer(structuredClone(state)), workspaceVersion };
       try {
         const syncResponse = await api.put('/api/workspace', payload);
+        workspaceVersion = syncResponse.data?.workspaceVersion || workspaceVersion;
         const versions = syncResponse.data?.versions || {};
         for (const collection of ['ventures', 'tasks', 'integrations', 'capabilities', 'activity']) {
           const versionMap = versions[collection] || {};
@@ -237,6 +239,7 @@ import { api, auth } from '@appdeploy/client';
       authStatus = 'loading';
       authError = '';
       syncReady = false;
+      workspaceVersion = null;
       syncState = 'idle';
       render();
       try {
@@ -260,6 +263,7 @@ import { api, auth } from '@appdeploy/client';
           throw new Error('Workspace initialization did not reach the complete state. Retry to resume safely.');
         }
         state = normalizeRemoteState(workspace.state);
+        workspaceVersion = typeof workspace.workspaceVersion === 'string' ? workspace.workspaceVersion : null;
         localStorage.setItem(LEGACY_IMPORTED_KEY, '1');
         localStorage.setItem(userCacheKey(user.userId), JSON.stringify(state));
         authStatus = 'ready';
@@ -304,6 +308,7 @@ import { api, auth } from '@appdeploy/client';
       }
       await auth.signOut();
       authUser = null;
+      workspaceVersion = null;
       authStatus = 'signed_out';
       authError = '';
       syncReady = false;
