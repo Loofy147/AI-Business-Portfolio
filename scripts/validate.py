@@ -126,8 +126,8 @@ def main() -> int:
     if audit.external_scripts:
         fail("the initial UI must not load remote scripts")
 
-    script_tags = re.findall(r"<script\\b[^>]*>", source, flags=re.I)
-    script_bodies = re.findall(r"<script\\b[^>]*>(.*?)</script\\s*>", source, flags=re.I | re.S)
+    script_tags = re.findall(r"<script\b[^>]*>", source, flags=re.I)
+    script_bodies = re.findall(r"<script\b[^>]*>(.*?)</script\s*>", source, flags=re.I | re.S)
     if len(script_tags) != 1 or len(script_bodies) != 1:
         fail("index.html must contain exactly one script tag")
     if './src/main.ts' not in script_tags[0] or script_bodies[0].strip():
