@@ -88,7 +88,7 @@ function validateWorkspace(value: unknown): WorkspaceState {
                 throw new InputValidationError(collection + ' contains duplicate record IDs.');
             }
             seen.add(sourceId);
-            const normalized = { ...record, id: sourceId };
+            const normalized: Record<string, unknown> = { ...record, id: sourceId };
             // Transport metadata is not user data; never persist a client-supplied version.
             delete normalized._version;
             rows.push(normalized);
