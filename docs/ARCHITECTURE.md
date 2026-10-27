@@ -30,7 +30,7 @@ The prototype currently supports:
 - Shared-capability records.
 - Local activity notes and JSON export.
 
-The app authenticates workspace users and enforces account partitioning in the workspace API, but the full cross-account E2E test is still open. It does **not** connect external integrations, run workflows, meter provider usage, or independently verify deployment status. A user-entered “verified” state in the integration registry must not be described as machine-verified.
+The app authenticates workspace users and derives the workspace key from the verified AppDeploy user ID. Persistence uses one fixed logical table (abp_workspaces) and one bounded workspace row per account; it does not generate per-user table names or scan shared tenant rows. A workspace update is a conditional compare-and-swap against workspaceVersion, and unknown outcomes are reconciled with a consistent read rather than blindly retried. Full-state replacement makes removals durable; stale clients receive a conflict and retain a local recovery snapshot. The row is capped at 220 KiB and each collection at 100 records. First-login, write/read/reload, and cross-account E2E tests remain open. A public health route checks whether the fixed table catalog can be read without returning account data. The app does **not** connect external integrations, run workflows, meter provider usage, or independently verify deployment status. A user-entered “verified” state in the integration registry must not be described as machine-verified.
 
 ## 4. Target logical architecture
 
@@ -57,7 +57,7 @@ Portfolio UI / Business product UIs
    Metrics, alerting, evaluation, release
 ```
 
-The first persistent/authenticated slice has been added. The next slice should independently test account isolation, bootstrap recovery, and concurrent updates, then implement one controlled workflow adapter and its execution record.
+The persistent/authenticated slice now uses a fixed-table atomic workspace document. The next gate is to verify database-catalog readiness and authenticated bootstrap/write/read/reload, then prove two-account isolation and stale-version rejection. Only after these pass should a controlled workflow adapter be enabled.
 
 ## 5. Core entities
 
