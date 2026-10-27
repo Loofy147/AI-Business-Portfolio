@@ -4,6 +4,15 @@ A build-first operating workspace for creating, launching, and running multiple 
 
 This repository is the source of truth for the product specification, implementation, integration contracts, validation, and release evidence. It is not a market-opportunity report or a directory wrapper.
 
+## Live preview
+
+**[Open the AI Business Portfolio workspace](https://ai-business-portfolio-0yfidw.v2.appdeploy.ai/)**
+
+The first release is a self-contained browser prototype. Records use localStorage in the current browser; the deployment is not yet a multi-user source of truth, no external provider is connected, and operator-entered integration statuses are not independently verified. Do not store credentials or real customer-sensitive data in this version.
+
+- Source: [GitHub repository](https://github.com/Loofy147/AI-Business-Portfolio)
+- Latest passing validation run: [GitHub Actions run #3](https://github.com/Loofy147/AI-Business-Portfolio/actions/runs/40494345607)
+
 ## Product objective
 
 Build reusable capabilities once, then assemble them into independent businesses and products. Each business can have its own customers, workflows, integrations, economics, operating rules, deployments, and release history while reusing shared infrastructure safely.
