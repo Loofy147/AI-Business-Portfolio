@@ -142,7 +142,7 @@ import { api, auth } from '@appdeploy/client';
       else if (authStatus === 'error') { label = 'Workspace error'; color = 'red'; }
       else if (authStatus === 'ready') {
         if (syncState === 'syncing') label = 'Saving…';
-        else if (syncState === 'error') { label = 'Sync needs attention'; color = 'red'; }
+        else if (syncState === 'error' || syncState === 'conflict') { label = syncState === 'conflict' ? 'Sync conflict' : 'Sync needs attention'; color = 'red'; }
         else { label = 'Account synced'; color = 'green'; }
       }
       indicator.innerHTML = '<span class="dot ' + (color === 'red' ? '' : color) + '"></span> ' + esc(label);
@@ -182,13 +182,26 @@ import { api, auth } from '@appdeploy/client';
       updateChrome();
       const payload = snapshotForServer(structuredClone(state));
       try {
-        await api.put('/api/workspace', payload);
+        const syncResponse = await api.put('/api/workspace', payload);
+        const versions = syncResponse.data?.versions || {};
+        for (const collection of ['ventures', 'tasks', 'integrations', 'capabilities', 'activity']) {
+          const versionMap = versions[collection] || {};
+          for (const item of state[collection]) {
+            if (versionMap[item.id]) item._version = versionMap[item.id];
+          }
+        }
+        localStorage.setItem(userCacheKey(authUser.userId), JSON.stringify(state));
         syncState = 'synced';
         authError = '';
         if (showToast) toast('Portfolio changes saved to your account.');
         return true;
       } catch (err) {
-        syncState = 'error';
+        syncState = err?.response?.status === 409 ? 'conflict' : 'error';
+        try {
+          localStorage.setItem(userCacheKey(authUser.userId) + '.conflict', JSON.stringify(state));
+        } catch (cacheError) {
+          console.warn('Conflict snapshot could not be retained locally.');
+        }
         authError = errorText(err, 'Could not synchronize portfolio records.');
         toast('Sync failed: ' + authError + '. Local changes are retained in this browser; retry before signing out.');
         return false;
@@ -301,6 +314,11 @@ import { api, auth } from '@appdeploy/client';
 
     async function refreshWorkspace() {
       if (authUser) {
+        if (syncState === 'conflict') {
+          toast('A newer server version exists. Your unsynced local snapshot was retained for recovery; reloading will show the server version.');
+          await loadAccountWorkspace(authUser);
+          return;
+        }
         if (syncState === 'error') {
           const saved = await syncWorkspaceNow(true);
           if (!saved) return;
