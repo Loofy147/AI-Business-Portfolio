@@ -129,6 +129,8 @@ import { api, auth } from '@appdeploy/client';
     function updateChrome() {
       const control = document.getElementById('auth-control');
       const indicator = document.getElementById('sync-status');
+      const storageHealth = document.getElementById('storage-health');
+      const storageDot = document.getElementById('storage-health-dot');
       if (control) {
         control.textContent = authUser ? 'Sign out' : (authStatus === 'loading' ? 'Opening…' : 'Sign in');
         control.disabled = authStatus === 'checking' || authStatus === 'loading';
@@ -147,6 +149,21 @@ import { api, auth } from '@appdeploy/client';
       }
       indicator.innerHTML = '<span class="dot ' + (color === 'red' ? '' : color) + '"></span> ' + esc(label);
       indicator.classList.toggle('sync-warning', color === 'red');
+      if (storageHealth && storageDot) {
+        let storageLabel = 'Sign-in required';
+        let storageColor = 'amber';
+        if (authStatus === 'checking') storageLabel = 'Checking session';
+        else if (authStatus === 'loading') storageLabel = 'Loading workspace';
+        else if (authStatus === 'error') { storageLabel = 'Needs attention'; storageColor = 'red'; }
+        else if (authStatus === 'ready') {
+          if (syncState === 'syncing') storageLabel = 'Saving…';
+          else if (syncState === 'error' || syncState === 'conflict') { storageLabel = 'Sync issue'; storageColor = 'red'; }
+          else { storageLabel = 'Account synced'; storageColor = 'green'; }
+        }
+        storageHealth.textContent = storageLabel;
+        storageDot.className = 'dot ' + (storageColor === 'red' ? '' : storageColor);
+        storageDot.classList.toggle('sync-warning', storageColor === 'red');
+      }
     }
 
     function renderAuthGate() {
@@ -296,6 +313,21 @@ import { api, auth } from '@appdeploy/client';
       render();
     }
 
+    async function verifyAnonymousBoundary() {
+      try {
+        await api.get('/api/workspace');
+        authStatus = 'error';
+        authError = 'Authorization check failed: the protected workspace endpoint returned a successful response without a signed-in account. Do not enter portfolio data until this is resolved.';
+      } catch (err) {
+        const status = Number(err?.response?.status || err?.statusCode || err?.status || 0);
+        if (status === 401 || status === 403) {
+          authError = '';
+        } else {
+          authError = 'Anonymous access denial could not be verified (status ' + (status || 'unknown') + '). Sign-in is still required; the protected endpoint response needs investigation.';
+        }
+      }
+    }
+
     async function bootAuth() {
       render();
       try {
@@ -303,6 +335,7 @@ import { api, auth } from '@appdeploy/client';
         if (user) await loadAccountWorkspace(user);
         else {
           authStatus = 'signed_out';
+          await verifyAnonymousBoundary();
           render();
         }
       } catch (err) {
