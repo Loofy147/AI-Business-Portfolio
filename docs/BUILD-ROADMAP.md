@@ -10,8 +10,9 @@ The roadmap tracks software and business delivery, not market-research completio
 - [x] Add local business/product, task, integration, capability, and activity records.
 - [x] Add JSON export and local browser persistence.
 - [x] Record the local-only prototype boundary.
-- [ ] Run repository validation locally and in GitHub Actions.
-- [ ] Inspect the deployed/hosted rendering on desktop and mobile.
+- [x] Add and run repository validation in GitHub Actions (latest pass: https://github.com/Loofy147/AI-Business-Portfolio/actions/runs/40494345607).
+- [ ] Run the same validator in an independent local checkout.
+- [x] Inspect deployed rendering on desktop/mobile with a read-only TinyFish smoke test (UI renders; no obvious frontend/network errors).
 
 ### Exit criteria
 - Required files and UI sections exist.
