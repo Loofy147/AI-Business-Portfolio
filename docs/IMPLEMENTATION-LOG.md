@@ -102,3 +102,30 @@
 - Concurrent edit behavior and user-facing conflict resolution.
 - Account deletion, retention, backup/restore, and security audit service.
 - Third-party workflow execution remains disabled.
+
+## 2026-10-27 — Authenticated storage deployment and anonymous denial check
+
+### Deployment evidence
+
+- AppDeploy app: `ai-business-portfolio-0yfidw`.
+- Latest observed deployment snapshot: `1793101457044`.
+- URL: https://ai-business-portfolio-0yfidw.v2.appdeploy.ai/
+- Status: **ready**.
+- AppDeploy reported no build/runtime frontend or network errors. Its runtime diagnostics recorded the unsigned `GET /api/workspace` request as HTTP 401 `Unauthorized`, which is the expected denial for the protected route.
+- Read-only TinyFish browser check: https://agent.tinyfish.ai/runs/4ebb9b95-9cac-4a88-9bc3-da2e6bee131c
+- Observed UI: authenticated gate, sign-in buttons, “Account-scoped storage — Sign-in required,” and “Provider connections — Not verified.”
+
+### CI evidence
+
+- GitHub Actions validation: https://github.com/Loofy147/AI-Business-Portfolio/actions/runs/40498331538
+- Observed status: **successful**, 9 seconds.
+- Associated commit: `25c88193c35210930fa0cbfe22fcf28a33b2038e`.
+- Scope: repository source checks and JavaScript syntax/guard markers. This is not an authenticated database integration test.
+
+### Still open
+
+- No signed-in authenticated write/read/reload test has been performed in this pass.
+- Cross-account isolation and concurrent-session conflict handling remain implementation requirements awaiting two-actor E2E verification.
+- Direct browser navigation to API URLs returned the app shell and did not expose raw responses; the relevant 401 evidence came from AppDeploy backend runtime diagnostics.
+- Database bootstrap, storage catalog behavior, partial bootstrap recovery, database quotas, and restore/retention behavior remain to be verified with an authenticated account.
+- External provider integrations and workflow execution remain disabled.
