@@ -72,3 +72,33 @@
 
 ### Remaining scope
 - Archive state and event recording are client-local and can be edited by the browser owner. Production requires server-side authorization, durable storage, and tamper-resistant audit events.
+
+## 2026-10-27 — Authenticated workspace persistence increment
+
+### Implemented in repository
+
+- Frontend now imports the AppDeploy client SDK for sign-in, session restoration, protected API calls, and sign-out.
+- Added an authentication gate to the main workspace. Portfolio sections are not rendered while the session/workspace is loading or signed out.
+- Added a per-account local cache key and a one-time legacy-browser import path for an account whose server workspace has not completed bootstrap.
+- Added `backend/index.ts` with:
+  - `GET /api/workspace` protected by `requireAuth()`.
+  - `POST /api/workspace/bootstrap` protected by `requireAuth()` and guarded by a resumable bootstrap marker.
+  - `PUT /api/workspace` protected by `requireAuth()`.
+  - `GET /api/health` public and limited to health metadata.
+- Storage uses per-user tables named from a SHA-256 hash of the authenticated AppDeploy user ID. Client-supplied user IDs do not select the workspace namespace.
+- Each resource row has a stable server ID derived from the record ID, a source ID, payload, and server version.
+- Payload validation checks collection arrays, record IDs, duplicate IDs, collection counts, request size, and row size.
+- Writes use bounded batches, conditional patches, a bounded retry path for known database conflicts, and a consistent-read reconciliation attempt for unknown database outcomes.
+- Optimistic version checks prevent a stale browser tab from silently overwriting a changed record. The frontend preserves a local conflict snapshot and surfaces a sync warning.
+- Test suite includes five AppDeploy E2E cases, including a two-account isolation scenario. The existence of the tests does not mean they have passed.
+
+### Open verification gates
+
+- AppDeploy deployment and TypeScript/backend validation.
+- Sign-in and initial bootstrap of an empty account.
+- Read/write persistence after reload using actual server records.
+- Two distinct authenticated test accounts proving cross-account record isolation.
+- Bootstrap partial-failure recovery.
+- Concurrent edit behavior and user-facing conflict resolution.
+- Account deletion, retention, backup/restore, and security audit service.
+- Third-party workflow execution remains disabled.
