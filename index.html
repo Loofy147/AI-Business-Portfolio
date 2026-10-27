@@ -124,6 +124,7 @@
     .status-launched { color: #b8f36b; background: #1a2a14; border-color: #3a542c; }
     .status-paused { color: #c5aff7; background: #282039; border-color: #45376b; }
     .status-blocked { color: #ff9da4; background: #301c21; border-color: #62333b; }
+    .status-archived { color: #aab3c0; background: #1d222a; border-color: #39414d; }
     .quiet { color: #7e8ca0; }
     .action-row { display: flex; flex-wrap: wrap; gap: 6px; }
     .side-stack { display: grid; gap: 15px; align-content: start; }
@@ -324,7 +325,7 @@
     'use strict';
 
     const STORAGE_KEY = 'ai-business-portfolio.v0.1';
-    const statusLabels = { planned: 'Planned', building: 'Building', validating: 'Validating', launched: 'Launched', paused: 'Paused', blocked: 'Blocked' };
+    const statusLabels = { planned: 'Planned', building: 'Building', validating: 'Validating', launched: 'Launched', paused: 'Paused', blocked: 'Blocked', archived: 'Archived' };
     const viewLabels = { overview: 'Overview', ventures: 'Businesses & products', build: 'Build board', integrations: 'Integrations', capabilities: 'Shared capabilities', activity: 'Evidence & activity' };
     const seed = {
       ventures: [
@@ -525,7 +526,7 @@
       const taskCount = state.tasks.filter(t=>t.ventureId===x.id).length;
       const doneCount = state.tasks.filter(t=>t.ventureId===x.id && t.status==='done').length;
       const links = (x.repo ? '<a href="'+esc(x.repo)+'" target="_blank" rel="noreferrer" class="btn btn-quiet btn-sm">Source ↗</a>' : '') + (x.deployment ? '<a href="'+esc(x.deployment)+'" target="_blank" rel="noreferrer" class="btn btn-quiet btn-sm">Deployment ↗</a>' : '');
-      return '<article class="venture-card"><div class="venture-card-top"><div class="venture-icon">'+esc(x.name.slice(0,1).toUpperCase())+'</div><div class="venture-title"><h3>'+esc(x.name)+'</h3><small>'+esc(x.kind)+'</small></div>'+statusBadge(x.status)+'</div><p>'+esc(x.outcome)+'</p><div class="venture-meta"><div><span class="meta-label">Regions</span><span class="meta-value">'+esc(x.regions||'Not specified')+'</span></div><div><span class="meta-label">Build tasks</span><span class="meta-value">'+doneCount+' / '+taskCount+' complete</span></div><div><span class="meta-label">Owner</span><span class="meta-value">'+esc(x.owner||'Unassigned')+'</span></div><div><span class="meta-label">Last changed</span><span class="meta-value">'+fmtDate(x.updatedAt)+'</span></div></div><div class="next-step"><strong>NEXT IMPLEMENTATION STEP</strong><span>'+esc(x.next||'Not specified')+'</span></div><div class="card-actions">'+links+'<button class="btn btn-secondary btn-sm" data-action="edit-venture" data-id="'+esc(x.id)+'">Edit record</button><button class="btn btn-secondary btn-sm" data-action="venture-status" data-id="'+esc(x.id)+'">Change state</button></div></article>';
+      return '<article class="venture-card"><div class="venture-card-top"><div class="venture-icon">'+esc(x.name.slice(0,1).toUpperCase())+'</div><div class="venture-title"><h3>'+esc(x.name)+'</h3><small>'+esc(x.kind)+'</small></div>'+statusBadge(x.status)+'</div><p>'+esc(x.outcome)+'</p><div class="venture-meta"><div><span class="meta-label">Regions</span><span class="meta-value">'+esc(x.regions||'Not specified')+'</span></div><div><span class="meta-label">Build tasks</span><span class="meta-value">'+doneCount+' / '+taskCount+' complete</span></div><div><span class="meta-label">Owner</span><span class="meta-value">'+esc(x.owner||'Unassigned')+'</span></div><div><span class="meta-label">Last changed</span><span class="meta-value">'+fmtDate(x.updatedAt)+'</span></div></div><div class="next-step"><strong>NEXT IMPLEMENTATION STEP</strong><span>'+esc(x.next||'Not specified')+'</span></div><div class="card-actions">'+links+'<button class="btn btn-secondary btn-sm" data-action="edit-venture" data-id="'+esc(x.id)+'">Edit record</button><button class="btn btn-secondary btn-sm" data-action="venture-status" data-id="'+esc(x.id)+'">Change state</button>'+(x.status!=='archived'?'<button class="btn btn-quiet btn-sm" data-action="archive-venture" data-id="'+esc(x.id)+'">Archive</button>':'')+'</div></article>';
     }
 
     function renderBuild() {
@@ -626,6 +627,7 @@
       if (action === 'new-venture') return openVentureForm();
       if (action === 'edit-venture') return openVentureForm(state.ventures.find(x=>x.id===recordId));
       if (action === 'venture-status') return openStatusForm(state.ventures.find(x=>x.id===recordId));
+      if (action === 'archive-venture') return openArchiveForm(state.ventures.find(x=>x.id===recordId));
       if (action === 'new-task') return openTaskForm();
       if (action === 'edit-task') return openTaskForm(state.tasks.find(x=>x.id===recordId));
       if (action === 'new-integration') return openIntegrationForm();
@@ -701,6 +703,34 @@
         addActivity(editing?'business / product updated':'business / product created',record.name+' record saved. Status: '+statusLabels[record.status]+'. '+(record.evidence||'No evidence note provided.'),'USER_REPORTED');
         toast(editing?'Record updated locally.':'Business/product added locally.');
       },'Lifecycle status reflects recorded state only. Deployment links are references; the UI does not verify that a URL is live.');
+    }
+
+    function openArchiveForm(item) {
+      if (!item || item.status === 'archived') return;
+      const html = field('Type ARCHIVE to confirm','confirmation','','text',true,'Type ARCHIVE');
+      showModal(
+        'Archive business / product',
+        'Archive this record without deleting its history or associated build tasks.',
+        html,
+        'Archive record',
+        data => {
+          if (data.confirmation.trim() !== 'ARCHIVE') {
+            throw new Error('Type ARCHIVE exactly to confirm this action.');
+          }
+          const previous = item.status;
+          item.status = 'archived';
+          item.updatedAt = new Date().toISOString();
+          item.evidence = (item.evidence ? item.evidence + ' ' : '') +
+            'Archived on ' + item.updatedAt + ' by a local operator; previous state: ' + previous + '.';
+          addActivity(
+            'business / product archived',
+            item.name + ' archived from ' + statusLabels[previous] + '. The record and related tasks were retained.',
+            'USER_REPORTED'
+          );
+          toast('Business/product archived. Record and tasks retained.');
+        },
+        'This is a reversible local state change, not permanent deletion. Use Change state to restore the record. State changes are not server-enforced in this prototype.'
+      );
     }
 
     function openStatusForm(item) {
