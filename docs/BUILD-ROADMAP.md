@@ -24,14 +24,18 @@ The roadmap tracks software and business delivery, not market-research completio
 ## Stage 1 — Durable identity and persistence (P0)
 
 ### Scope
-- [ ] Select the production hosting and database boundary using official docs and actual account availability.
-- [ ] Add authentication and logout.
+- [x] Select AppDeploy as the current hosted UI/API boundary and AppDeploy database SDK for scoped persistence.
+- [x] Add AppDeploy authentication, sign-in/out, and protected workspace routes.
 - [ ] Define workspace membership and role model.
-- [ ] Move records from browser storage to server-backed persistence.
-- [ ] Add schema validation and versioned migrations.
-- [ ] Enforce authorization on every list, read, create, update, delete, export, and administrative operation.
-- [ ] Add durable server-side activity and evidence records.
-- [ ] Provide data export and account/workspace deletion policy.
+- [x] Move portfolio collections to server-backed, account-partitioned persistence; retain browser storage as account cache and one-time legacy bootstrap source.
+- [x] Add payload/collection size checks, ID validation, duplicate-ID rejection, and version checks.
+- [ ] Add versioned schema migrations and a tested restore path.
+- [x] Protect current workspace read, bootstrap, and sync routes with requireAuth and derive per-user storage partition from the verified auth user.
+- [ ] Add independent two-user authorization tests and server-side roles/administrative policies.
+- [x] Persist portfolio activity and evidence notes in the account-scoped workspace collections.
+- [ ] Add a tamper-resistant security audit service and actor/authorization decision fields.
+- [x] Provide browser-triggered JSON export of the authenticated workspace.
+- [ ] Define and implement server-side account/workspace deletion, retention, and export guarantees.
 
 ### Acceptance gate
 - Two test identities cannot read, mutate, or infer each other's private records.
