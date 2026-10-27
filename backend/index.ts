@@ -28,6 +28,7 @@ const MAX_ROW_BYTES = 220 * 1024;
 const MAX_REQUEST_BYTES = 850 * 1024;
 
 class InputValidationError extends Error {}
+class WorkspaceConflictError extends Error {}
 
 function asRecord(value: unknown): Record<string, unknown> {
     return value && typeof value === 'object' && !Array.isArray(value)
@@ -118,7 +119,11 @@ function isRetryableConflict(err: unknown): boolean {
         || err.code === 'AppDatabaseDuplicateId';
 }
 
-async function upsertBatch(table: string, records: Array<Record<string, unknown>>): Promise<void> {
+async function upsertBatch(
+    table: string,
+    records: Array<Record<string, unknown>>,
+    requireVersions: boolean
+): Promise<void> {
     const ids = records.map(item => physicalId(String(item.id)));
     for (let attempt = 0; attempt < 3; attempt += 1) {
         const existing = await db.get<StoredRecord>(table, ids, { consistent: true });
@@ -132,6 +137,12 @@ async function upsertBatch(table: string, records: Array<Record<string, unknown>
                 throw new Error('A record ID collision was detected; no overwrite was attempted.');
             }
             if (prior && samePayload(prior.payload, payload)) return;
+            if (prior && requireVersions && source._version !== prior.updatedAt) {
+                throw new WorkspaceConflictError('This record changed on the server. Keep the local conflict snapshot and reload before retrying.');
+            }
+            if (prior && typeof source._version === 'string' && source._version !== prior.updatedAt) {
+                throw new WorkspaceConflictError('This record changed on the server. Keep the local conflict snapshot and reload before retrying.');
+            }
 
             const value = {
                 sourceId,
@@ -142,7 +153,7 @@ async function upsertBatch(table: string, records: Array<Record<string, unknown>
                 operations.push(db.tx.update(table, [{
                     id: ids[index],
                     record: value,
-                    if: { sourceId }
+                    if: { sourceId, updatedAt: prior.updatedAt }
                 }], { patch: true }));
             } else {
                 operations.push(db.tx.add(table, [{
@@ -180,13 +191,13 @@ async function upsertBatch(table: string, records: Array<Record<string, unknown>
     throw new Error('Workspace changed concurrently. Refresh and retry the save.');
 }
 
-async function writeWorkspace(userId: string, state: WorkspaceState): Promise<void> {
+async function writeWorkspace(userId: string, state: WorkspaceState, requireVersions: boolean): Promise<void> {
     const partition = userPartition(userId);
     for (const collection of COLLECTIONS) {
         const records = state[collection];
         const table = tableFor(collection, partition);
         for (let offset = 0; offset < records.length; offset += BATCH_SIZE) {
-            await upsertBatch(table, records.slice(offset, offset + BATCH_SIZE));
+            await upsertBatch(table, records.slice(offset, offset + BATCH_SIZE), requireVersions);
         }
     }
 }
@@ -197,7 +208,8 @@ async function readCollection(collection: CollectionName, partition: string) {
     });
     const items = response.items.map(item => ({
         ...asRecord(item.payload),
-        id: item.sourceId || item.id
+        id: item.sourceId || item.id,
+        _version: item.updatedAt
     }));
     return { items, hasMore: Boolean(response.nextToken) };
 }
@@ -235,7 +247,8 @@ async function getWorkspaceFor(userId: string) {
 }
 
 function clientError(err: unknown): string {
-    return err instanceof InputValidationError ? err.message : 'The workspace request could not be completed.';
+    if (err instanceof InputValidationError || err instanceof WorkspaceConflictError) return err.message;
+    return 'The workspace request could not be completed.';
 }
 
 async function bootstrapWorkspace(
@@ -271,7 +284,7 @@ async function bootstrapWorkspace(
         return { status: 409, body: { error: 'Workspace bootstrap state is invalid. Inspect the workspace before retrying.' } };
     }
 
-    await writeWorkspace(userId, state);
+    await writeWorkspace(userId, state, false);
     const [completed] = await db.tx.update(meta, [{
         id: 'bootstrap',
         record: {
@@ -319,7 +332,7 @@ export const handler = router({
                 return json(result.body);
             } catch (err: unknown) {
                 console.error('workspace_bootstrap_failed', err);
-                return error(clientError(err), err instanceof InputValidationError ? 400 : 500);
+                return error(clientError(err), err instanceof InputValidationError ? 400 : err instanceof WorkspaceConflictError ? 409 : 500);
             }
         }
     ],
@@ -333,8 +346,18 @@ export const handler = router({
                     return error('Workspace bootstrap is not complete. Reload the workspace before saving.', 409);
                 }
                 const state = validateWorkspace(ctx.body);
-                await writeWorkspace(ctx.user!.userId, state);
-                return json({ ok: true, syncedAt: new Date().toISOString() });
+                await writeWorkspace(ctx.user!.userId, state, true);
+                const persisted = await getWorkspaceFor(ctx.user!.userId);
+                const versions: Record<string, Record<string, string>> = {};
+                for (const collection of COLLECTIONS) {
+                    versions[collection] = {};
+                    for (const item of persisted.state[collection]) {
+                        if (typeof item.id === 'string' && typeof item._version === 'string') {
+                            versions[collection][item.id] = item._version;
+                        }
+                    }
+                }
+                return json({ ok: true, syncedAt: new Date().toISOString(), versions });
             } catch (err: unknown) {
                 console.error('workspace_sync_failed', err);
                 return error(clientError(err), err instanceof InputValidationError ? 400 : 500);
