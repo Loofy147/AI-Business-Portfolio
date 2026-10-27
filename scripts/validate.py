@@ -37,6 +37,9 @@ REQUIRED_MARKERS = [
     "exportState",
     "candidate",
     "verified",
+    "archive-venture",
+    "function openArchiveForm",
+    "status-archived",
     "ai-business-portfolio.v0.1",
 ]
 
