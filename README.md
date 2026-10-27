@@ -50,7 +50,13 @@ Conversation text and vendor marketing do not, by themselves, prove implementati
 
 ```text
 .
-├── index.html                  # Initial interactive, self-contained portfolio workspace
+├── index.html                  # Portfolio interface shell and styles
+├── src/
+│   └── main.ts                 # UI, AppDeploy auth, and remote workspace sync
+├── backend/
+│   └── index.ts                # Authenticated user-partitioned workspace API
+├── tests/
+│   └── tests.json              # AppDeploy end-to-end acceptance tests
 ├── README.md
 ├── SECURITY.md
 ├── docs/
@@ -65,11 +71,11 @@ Conversation text and vendor marketing do not, by themselves, prove implementati
         └── validate.yml
 ```
 
-The first UI is a dependency-free browser prototype. Its local browser storage is suitable for UI exploration only; it is **not** multi-user persistence, a secure system of record, or production authorization. The next implementation stage adds server-enforced identity, persistent storage, tenant isolation, integration execution, observability, and automated acceptance tests.
+The UI is bundled for AppDeploy and uses the AppDeploy authentication/API client. After sign-in, records are persisted server-side in user-partitioned collections; the first account bootstrap can import the current browser's legacy portfolio when the server workspace is empty. The browser cache remains a convenience, not the system of record. External providers are still candidates and no workflow runs against them yet. Tenant-isolation tests, database recovery, operational observability, and independent production hardening remain open.
 
 ## Run locally
 
-Open `index.html` in a modern browser. No package installation or external network requests are required.
+The application bundle needs AppDeploy's injected `@appdeploy/client` and backend SDK. The supported deployment target is AppDeploy; opening `index.html` directly as a file will not resolve the bundled SDK import. Repository checks run through GitHub Actions and can be invoked with:
 
 Run the repository checks:
 
