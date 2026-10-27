@@ -30,7 +30,7 @@ The prototype currently supports:
 - Shared-capability records.
 - Local activity notes and JSON export.
 
-The prototype does **not** authenticate users, enforce access policies, connect external integrations, run workflows, meter provider usage, or independently verify a deployment. A user-entered “verified” state must not be described as machine-verified.
+The app authenticates workspace users and enforces account partitioning in the workspace API, but the full cross-account E2E test is still open. It does **not** connect external integrations, run workflows, meter provider usage, or independently verify deployment status. A user-entered “verified” state in the integration registry must not be described as machine-verified.
 
 ## 4. Target logical architecture
 
@@ -57,7 +57,7 @@ Portfolio UI / Business product UIs
    Metrics, alerting, evaluation, release
 ```
 
-The first production rollout should not implement all boxes at once. The next slice should establish identity and persistence, then one controlled workflow adapter and its execution record.
+The first persistent/authenticated slice has been added. The next slice should independently test account isolation, bootstrap recovery, and concurrent updates, then implement one controlled workflow adapter and its execution record.
 
 ## 5. Core entities
 
