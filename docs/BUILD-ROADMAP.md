@@ -6,7 +6,7 @@ The roadmap tracks software and business delivery, not market-research completio
 
 ### Scope
 - [x] Establish this repository as the product source of truth.
-- [x] Add a self-contained portfolio UI.
+- [x] Add a self-contained portfolio UI, including a reversible archive action with typed confirmation.
 - [x] Add local business/product, task, integration, capability, and activity records.
 - [x] Add JSON export and local browser persistence.
 - [x] Record the local-only prototype boundary.
