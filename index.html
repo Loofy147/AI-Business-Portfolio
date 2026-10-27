@@ -749,7 +749,7 @@
         if(!data.name.trim()||!data.role.trim()||!data.url.trim()||!data.evidence.trim()) throw new Error('Name, role, documentation URL, and evidence note are required.');
         const newUrl=validUrl(data.url);
         if(!newUrl) throw new Error('Enter a valid HTTPS documentation URL.');
-        if(data.status==='verified' && !/(https:\\/\\/|commit|test|ci|run id|sha256|verified by)/i.test(data.evidence)) throw new Error('For Verified, include a test artifact, commit, CI/run reference, hash, or explicit verification record.');
+        if(data.status==='verified' && !/(https:\/\/|commit|test|ci|run id|sha256|verified by)/i.test(data.evidence)) throw new Error('For Verified, include a test artifact, commit, CI/run reference, hash, or explicit verification record.');
         const record={...x,name:data.name.trim(),role:data.role.trim(),category:data.category.trim(),url:newUrl,status:data.status,evidence:data.evidence.trim(),region:data.region.trim()};
         if(editing) Object.assign(item,record); else state.integrations.push({id:id('integration'),...record});
         addActivity('integration registry updated',record.name+' recorded as '+record.status+'. Evidence: '+record.evidence,'USER_REPORTED');
