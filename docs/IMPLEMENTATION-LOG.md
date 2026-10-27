@@ -154,3 +154,25 @@
 - [ ] Two separate authenticated accounts demonstrate isolation.
 
 The current implementation does not add provider execution, backup/restore, account deletion/retention, or a tamper-resistant audit service.
+
+
+## 2026-10-27 — Fixed-table workspace deployment and health verification
+
+### Deployment and source evidence
+
+- GitHub PR: https://github.com/Loofy147/AI-Business-Portfolio/pull/1 — merged by squash.
+- Source correction after the PR merge: commit https://github.com/Loofy147/AI-Business-Portfolio/commit/3d7cc6cdba48f46cf4a0197f4ec0ccb977816977 fixes an explicit TypeScript record annotation required by AppDeploy compilation.
+- GitHub Actions run #34 on that exact source commit: https://github.com/Loofy147/AI-Business-Portfolio/actions/runs/40556087136 — **completed successfully**. Scope is the repository validator and frontend syntax checks; this is not a signed-in database integration test.
+- AppDeploy app: ai-business-portfolio-0yfidw; deployment snapshot 1793124102008; state **ready**; URL: https://ai-business-portfolio-0yfidw.v2.appdeploy.ai/.
+- AppDeploy post-deployment QA snapshot reported no frontend errors or network errors. The runtime diagnostics show unauthenticated GET /api/workspace requests rejected with HTTP 401 Unauthorized, as intended by requireAuth.
+- Public health probe via https://api-v2.appdeploy.ai/app/ai-business-portfolio-0yfidw/api/health returned HTTP 200 with {\"ok\":true,\"service\":\"ai-business-portfolio-api\",\"databaseCatalogReady\":true,\"authRequiredForWorkspace\":true}. This proves the fixed logical table is readable in this deployment, not that authenticated account writes/reloads have passed.
+
+### Remaining verification gates
+
+- [ ] Sign in with a test account and verify first-time bootstrap, create/edit, save, and reload.
+- [ ] Verify removal persists after reload.
+- [ ] Verify two distinct authenticated accounts cannot access each other's workspace.
+- [ ] Verify stale-version conflicts in two tabs and preserve a recovery snapshot.
+- [ ] Rehearse backup/restore, account deletion/retention and recovery from unknown database outcomes.
+
+No third-party provider execution is enabled.
